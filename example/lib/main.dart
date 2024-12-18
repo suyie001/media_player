@@ -34,6 +34,7 @@ class _MyHomePageState extends State<MyHomePage> {
   MediaItem? _currentItem;
   PlaybackState _playbackState = PlaybackState.none;
   Duration _position = Duration.zero;
+  Duration _duration = Duration.zero;
   List<MediaItem> _playlist = [];
 
   @override
@@ -65,17 +66,55 @@ class _MyHomePageState extends State<MyHomePage> {
         duration: const Duration(minutes: 4, seconds: 15),
         artworkUrl: 'https://rabbit-u.oss-cn-hangzhou.aliyuncs.com/uploadfile/20240702/666699915832905728.jpg',
       ),
+      MediaItem(
+        id: '3',
+        title: '花絮1',
+        url: 'http://oss-api-audio.zuidie.net/audio/MP3L/637f0001a2b8485faf78460c2367d3cc.mp3',
+        artist: 'Artist 2',
+        album: '没出息',
+        duration: const Duration(minutes: 4, seconds: 15),
+        artworkUrl: 'https://rabbit-u.oss-cn-hangzhou.aliyuncs.com/uploadfile/20240702/666699915832905728.jpg',
+      ),
+      MediaItem(
+        id: '4',
+        title: '高清',
+        url: 'http://oss-api-audio.zuidie.net/audio/MP3H/94703ba232f343a6b4a0c970c6eaa6d1.mp3',
+        artist: 'Artist 2',
+        album: '没出息',
+        duration: const Duration(minutes: 4, seconds: 15),
+        artworkUrl: 'https://rabbit-u.oss-cn-hangzhou.aliyuncs.com/uploadfile/20240702/666699915832905728.jpg',
+      ),
+      MediaItem(
+        id: '5',
+        title: '普通',
+        url: 'http://oss-api-audio.zuidie.net/audio/MP3L/94703ba232f343a6b4a0c970c6eaa6d1.mp3',
+        artist: 'Artist 2',
+        album: '没出息',
+        duration: const Duration(minutes: 4, seconds: 15),
+        artworkUrl: 'https://rabbit-u.oss-cn-hangzhou.aliyuncs.com/uploadfile/20240702/666699915832905728.jpg',
+      ),
+      MediaItem(
+        id: '6',
+        title: '无损',
+        url: 'http://oss-api-audio.zuidie.net/audio/FLAC/94703ba232f343a6b4a0c970c6eaa6d1.flac',
+        artist: 'Artist 2',
+        album: '没出息',
+        duration: const Duration(minutes: 4, seconds: 15),
+        artworkUrl: 'https://rabbit-u.oss-cn-hangzhou.aliyuncs.com/uploadfile/20240702/666699915832905728.jpg',
+      ),
     ];
 
     await _player.setPlaylist(playlist);
 
     // 监听播放状态变化
     _player.playbackStateStream.listen((state) {
+      print('播放状态: ${state.name}');
       setState(() => _playbackState = state);
     });
 
     // 监听当前媒体项变化
     _player.mediaItemStream.listen((item) {
+      print('当前媒体项: ${item?.title},id: ${item?.id}');
       setState(() => _currentItem = item);
     });
 
@@ -86,16 +125,15 @@ class _MyHomePageState extends State<MyHomePage> {
 
     // 监听播放列表变化
     _player.playlistStream.listen((playlist) {
+      print('播放列表: ${playlist.map((e) => e.title).join(', ')}');
       setState(() => _playlist = playlist);
     });
 
     // 监听媒体时长变化
-    _player.durationStream.listen((duration) {
-      if (mounted && _currentItem != null) {
-        setState(() {
-          _currentItem = _currentItem!.copyWith(duration: duration);
-        });
-      }
+    _player.durationStream.listen((Duration duration) {
+      setState(() {
+        _duration = duration;
+      });
     });
 
     // 监听播放完成
@@ -146,7 +184,7 @@ class _MyHomePageState extends State<MyHomePage> {
           ],
 
           // 进度条
-          if (_currentItem?.duration != null) ...[
+          if (_duration != Duration.zero) ...[
             const SizedBox(height: 20),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -156,13 +194,13 @@ class _MyHomePageState extends State<MyHomePage> {
                   Expanded(
                     child: Slider(
                       value: _position.inMilliseconds.toDouble(),
-                      max: _currentItem!.duration!.inMilliseconds.toDouble(),
+                      max: _duration.inMilliseconds.toDouble(),
                       onChanged: (value) {
                         _player.seekTo(Duration(milliseconds: value.toInt()));
                       },
                     ),
                   ),
-                  Text(_formatDuration(_currentItem!.duration!)),
+                  Text(_formatDuration(_duration)),
                 ],
               ),
             ),

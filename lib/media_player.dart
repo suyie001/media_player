@@ -26,6 +26,18 @@ class MediaPlayer {
   /// 获取播放位置流
   Stream<Duration> get positionStream => _eventChannel.positionStream;
 
+  /// 获取媒体时长流
+  Stream<Duration> get durationStream => _eventChannel.durationStream;
+
+  /// 获取缓冲进度流
+  Stream<double> get bufferStream => _eventChannel.bufferStream;
+
+  /// 获取缓冲状态流
+  Stream<bool> get bufferingStream => _eventChannel.bufferingStream;
+
+  /// 获取播放完成流
+  Stream<bool> get completedStream => _eventChannel.completedStream;
+
   /// 获取错误流
   Stream<String> get errorStream => _eventChannel.errorStream;
 

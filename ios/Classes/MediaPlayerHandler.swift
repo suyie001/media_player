@@ -338,6 +338,19 @@ class MediaPlayerHandler: NSObject {
         }
         eventSink?(["type": "playlistChanged", "data": playlistData])
         
+        // 发送当前媒体项变化事件
+        if let currentItem = playlist[safe: currentIndex] {
+            var mappedItem = [String: Any]()
+            mappedItem["id"] = currentItem["id"]
+            mappedItem["title"] = currentItem["title"]
+            mappedItem["artist"] = currentItem["artist"]
+            mappedItem["album"] = currentItem["album"]
+            mappedItem["duration"] = currentItem["duration"]
+            mappedItem["artworkUrl"] = currentItem["artworkUrl"]
+            mappedItem["url"] = currentItem["url"]
+            eventSink?(["type": "mediaItemChanged", "data": mappedItem])
+        }
+        
         // 预加载封面图
         for item in items {
             if let artworkUrlString = item["artworkUrl"] as? String,
@@ -351,6 +364,19 @@ class MediaPlayerHandler: NSObject {
                 }
             }
         }
+    }
+    
+    // 添加一个辅助方法来创建媒体项的映射
+    private func createMediaItemMap(from item: [String: Any]) -> [String: Any] {
+        var mappedItem = [String: Any]()
+        mappedItem["id"] = item["id"]
+        mappedItem["title"] = item["title"]
+        mappedItem["artist"] = item["artist"]
+        mappedItem["album"] = item["album"]
+        mappedItem["duration"] = item["duration"]
+        mappedItem["artworkUrl"] = item["artworkUrl"]
+        mappedItem["url"] = item["url"]
+        return mappedItem
     }
     
     @objc private func handleItemReadyToPlay(_ notification: Notification) {
@@ -392,15 +418,7 @@ class MediaPlayerHandler: NSObject {
         play()
         
         if let currentItem = playlist[safe: currentIndex] {
-            var mappedItem = [String: Any]()
-            mappedItem["id"] = currentItem["id"]
-            mappedItem["title"] = currentItem["title"]
-            mappedItem["artist"] = currentItem["artist"]
-            mappedItem["album"] = currentItem["album"]
-            mappedItem["duration"] = currentItem["duration"]
-            mappedItem["artworkUrl"] = currentItem["artworkUrl"]
-            mappedItem["url"] = currentItem["url"]
-            eventSink?(["type": "mediaItemChanged", "data": mappedItem])
+            eventSink?(["type": "mediaItemChanged", "data": createMediaItemMap(from: currentItem)])
         }
     }
     
@@ -412,15 +430,7 @@ class MediaPlayerHandler: NSObject {
         play()
         
         if let currentItem = playlist[safe: currentIndex] {
-            var mappedItem = [String: Any]()
-            mappedItem["id"] = currentItem["id"]
-            mappedItem["title"] = currentItem["title"]
-            mappedItem["artist"] = currentItem["artist"]
-            mappedItem["album"] = currentItem["album"]
-            mappedItem["duration"] = currentItem["duration"]
-            mappedItem["artworkUrl"] = currentItem["artworkUrl"]
-            mappedItem["url"] = currentItem["url"]
-            eventSink?(["type": "mediaItemChanged", "data": mappedItem])
+            eventSink?(["type": "mediaItemChanged", "data": createMediaItemMap(from: currentItem)])
         }
     }
     
