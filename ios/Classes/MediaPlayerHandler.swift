@@ -8,6 +8,7 @@ class MediaPlayerHandler: NSObject {
     private var playerItems: [AVPlayerItem] = []
     private var currentIndex: Int = 0
     private var playlist: [[String: Any]] = []
+    private var artworkCache: [String: MPMediaItemArtwork] = [:]
     
     private var eventSink: FlutterEventSink?
     
@@ -171,20 +172,31 @@ class MediaPlayerHandler: NSObject {
         nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = player.rate
         nowPlayingInfo[MPNowPlayingInfoPropertyDefaultPlaybackRate] = 1.0
         
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
-        
-        if let artworkUrlString = currentItem["artworkUrl"] as? String,
-           let artworkUrl = URL(string: artworkUrlString) {
-            loadArtwork(from: artworkUrl) { [weak self] image in
-                guard let self = self,
-                      let image = image,
-                      self.currentIndex < self.playlist.count else { return }
+        if let artworkUrlString = currentItem["artworkUrl"] as? String {
+            if let cachedArtwork = artworkCache[artworkUrlString] {
+                nowPlayingInfo[MPMediaItemPropertyArtwork] = cachedArtwork
+                MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
+            } else if let artworkUrl = URL(string: artworkUrlString) {
+                MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
                 
-                var updatedInfo = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
-                let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
-                updatedInfo[MPMediaItemPropertyArtwork] = artwork
-                MPNowPlayingInfoCenter.default().nowPlayingInfo = updatedInfo
+                loadArtwork(from: artworkUrl) { [weak self] image in
+                    guard let self = self,
+                          let image = image else { return }
+                    
+                    let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+                    self.artworkCache[artworkUrlString] = artwork
+                    
+                    if self.currentIndex < self.playlist.count,
+                       let currentArtworkUrl = self.playlist[self.currentIndex]["artworkUrl"] as? String,
+                       currentArtworkUrl == artworkUrlString {
+                        var updatedInfo = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
+                        updatedInfo[MPMediaItemPropertyArtwork] = artwork
+                        MPNowPlayingInfoCenter.default().nowPlayingInfo = updatedInfo
+                    }
+                }
             }
+        } else {
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
         }
     }
     
@@ -232,6 +244,8 @@ class MediaPlayerHandler: NSObject {
     }
     
     func setPlaylist(_ items: [[String: Any]]) {
+        artworkCache.removeAll()
+        
         playlist = items
         playerItems = items.compactMap { item in
             guard let urlString = item["url"] as? String,
@@ -246,6 +260,19 @@ class MediaPlayerHandler: NSObject {
         updateNowPlayingInfo()
         
         eventSink?(["type": "playlistChanged", "data": items])
+        
+        for item in items {
+            if let artworkUrlString = item["artworkUrl"] as? String,
+               let artworkUrl = URL(string: artworkUrlString),
+               artworkCache[artworkUrlString] == nil {
+                loadArtwork(from: artworkUrl) { [weak self] image in
+                    guard let self = self,
+                          let image = image else { return }
+                    let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+                    self.artworkCache[artworkUrlString] = artwork
+                }
+            }
+        }
     }
     
     func play() {
