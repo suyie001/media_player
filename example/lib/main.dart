@@ -104,8 +104,6 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
     ];
 
-    await _player.setPlaylist(playlist);
-
     // 监听播放状态变化
     _player.playbackStateStream.listen((state) {
       print('播放状态: ${state.name}');
@@ -159,6 +157,7 @@ class _MyHomePageState extends State<MyHomePage> {
         SnackBar(content: Text('Error: $error')),
       );
     });
+    await _player.setPlaylist(playlist);
   }
 
   @override
