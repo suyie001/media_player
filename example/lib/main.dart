@@ -54,7 +54,7 @@ class _MyHomePageState extends State<MyHomePage> {
         artist: 'Artist 1',
         album: 'Album 1',
         duration: const Duration(minutes: 3, seconds: 30),
-        artworkUrl: 'https://example.com/artwork1.jpg',
+        artworkUrl: 'https://rabbit-u.oss-cn-hangzhou.aliyuncs.com/uploadfile/20240702/666699915832905728.jpg',
       ),
       MediaItem(
         id: '2',
@@ -63,7 +63,7 @@ class _MyHomePageState extends State<MyHomePage> {
         artist: 'Artist 2',
         album: 'Album 2',
         duration: const Duration(minutes: 4, seconds: 15),
-        artworkUrl: 'http://dev-oss-api-audio.zuidie.net/uploadfile/20241113/715233863684767744.png',
+        artworkUrl: 'https://rabbit-u.oss-cn-hangzhou.aliyuncs.com/uploadfile/20240702/666699915832905728.jpg',
       ),
     ];
 

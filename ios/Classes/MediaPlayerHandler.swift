@@ -171,32 +171,58 @@ class MediaPlayerHandler: NSObject {
         nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = player.rate
         nowPlayingInfo[MPNowPlayingInfoPropertyDefaultPlaybackRate] = 1.0
         
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
+        
         if let artworkUrlString = currentItem["artworkUrl"] as? String,
            let artworkUrl = URL(string: artworkUrlString) {
             loadArtwork(from: artworkUrl) { [weak self] image in
-                if let image = image {
-                    nowPlayingInfo[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(
-                        boundsSize: image.size,
-                        requestHandler: { _ in image }
-                    )
-                }
-                MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
+                guard let self = self,
+                      let image = image,
+                      self.currentIndex < self.playlist.count else { return }
+                
+                var updatedInfo = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
+                let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+                updatedInfo[MPMediaItemPropertyArtwork] = artwork
+                MPNowPlayingInfoCenter.default().nowPlayingInfo = updatedInfo
             }
-        } else {
-            MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
         }
     }
     
     private func loadArtwork(from url: URL, completion: @escaping (UIImage?) -> Void) {
-        URLSession.shared.dataTask(with: url) { data, _, error in
-            DispatchQueue.main.async {
-                if let data = data, error == nil {
-                    completion(UIImage(data: data))
-                } else {
+        let session = URLSession(configuration: .ephemeral)
+        let task = session.dataTask(with: url) { data, response, error in
+            guard let data = data,
+                  let response = response as? HTTPURLResponse,
+                  error == nil,
+                  response.statusCode == 200,
+                  let image = UIImage(data: data) else {
+                DispatchQueue.main.async {
                     completion(nil)
                 }
+                return
             }
-        }.resume()
+            
+            let maxSize: CGFloat = 1024
+            var finalImage = image
+            
+            if image.size.width > maxSize || image.size.height > maxSize {
+                let scale = maxSize / max(image.size.width, image.size.height)
+                let newSize = CGSize(width: image.size.width * scale,
+                                   height: image.size.height * scale)
+                
+                UIGraphicsBeginImageContextWithOptions(newSize, false, 0)
+                image.draw(in: CGRect(origin: .zero, size: newSize))
+                if let resized = UIGraphicsGetImageFromCurrentImageContext() {
+                    finalImage = resized
+                }
+                UIGraphicsEndImageContext()
+            }
+            
+            DispatchQueue.main.async {
+                completion(finalImage)
+            }
+        }
+        task.resume()
     }
     
     // MARK: - Public Methods
