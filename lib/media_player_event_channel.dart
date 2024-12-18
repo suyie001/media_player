@@ -23,6 +23,10 @@ enum MediaPlayerEventType {
   mediaItemChanged,
   playlistChanged,
   positionChanged,
+  durationChanged,
+  completed,
+  bufferChanged,
+  bufferingChanged,
   errorOccurred,
   unknown,
 }
@@ -62,6 +66,19 @@ class MediaPlayerEventChannel {
   /// 获取播放位置流
   Stream<Duration> get positionStream =>
       eventStream.where((event) => event.type == MediaPlayerEventType.positionChanged).map((event) => Duration(milliseconds: event.data));
+
+  /// 获取媒体时长流
+  Stream<Duration> get durationStream =>
+      eventStream.where((event) => event.type == MediaPlayerEventType.durationChanged).map((event) => Duration(milliseconds: event.data));
+
+  /// 获取播放完成流
+  Stream<bool> get completedStream => eventStream.where((event) => event.type == MediaPlayerEventType.completed).map((event) => event.data as bool);
+
+  /// 获取缓冲进度流
+  Stream<double> get bufferStream => eventStream.where((event) => event.type == MediaPlayerEventType.bufferChanged).map((event) => event.data as double);
+
+  /// 获取缓冲状态流
+  Stream<bool> get bufferingStream => eventStream.where((event) => event.type == MediaPlayerEventType.bufferingChanged).map((event) => event.data as bool);
 
   /// 获取错误流
   Stream<String> get errorStream => eventStream.where((event) => event.type == MediaPlayerEventType.errorOccurred).map((event) => event.data.toString());

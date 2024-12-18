@@ -40,6 +40,27 @@ class MediaItem {
         duration: map['duration'] != null ? Duration(milliseconds: map['duration']) : null,
         artworkUrl: map['artworkUrl'],
       );
+
+  /// 创建一个新的 MediaItem，可以选择性地更新某些字段
+  MediaItem copyWith({
+    String? id,
+    String? title,
+    String? url,
+    String? artist,
+    String? album,
+    Duration? duration,
+    String? artworkUrl,
+  }) {
+    return MediaItem(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      url: url ?? this.url,
+      artist: artist ?? this.artist,
+      album: album ?? this.album,
+      duration: duration ?? this.duration,
+      artworkUrl: artworkUrl ?? this.artworkUrl,
+    );
+  }
 }
 
 /// 播放状态枚举

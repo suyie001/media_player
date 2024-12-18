@@ -89,6 +89,32 @@ class _MyHomePageState extends State<MyHomePage> {
       setState(() => _playlist = playlist);
     });
 
+    // 监听媒体时长变化
+    _player.durationStream.listen((duration) {
+      if (mounted && _currentItem != null) {
+        setState(() {
+          _currentItem = _currentItem!.copyWith(duration: duration);
+        });
+      }
+    });
+
+    // 监听播放完成
+    _player.completedStream.listen((completed) {
+      if (completed) {
+        print('播放完成');
+      }
+    });
+
+    // 监听缓冲进度
+    _player.bufferStream.listen((progress) {
+      print('缓冲进度: ${(progress * 100).toStringAsFixed(1)}%');
+    });
+
+    // 监听缓冲状态
+    _player.bufferingStream.listen((isBuffering) {
+      print('是否正在缓冲: $isBuffering');
+    });
+
     // 监听错误
     _player.errorStream.listen((error) {
       ScaffoldMessenger.of(context).showSnackBar(
