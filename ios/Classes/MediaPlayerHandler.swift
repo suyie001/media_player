@@ -142,7 +142,11 @@ class MediaPlayerHandler: NSObject {
             forInterval: CMTime(seconds: 1, preferredTimescale: 1),
             queue: .main
         ) { [weak self] time in
-            self?.updateNowPlayingInfo()
+            guard let self = self else { return }
+            self.updateNowPlayingInfo()
+            
+            let position = Int(time.seconds * 1000)
+            self.eventSink?(["type": "positionChanged", "data": position])
         }
     }
     
@@ -259,7 +263,18 @@ class MediaPlayerHandler: NSObject {
         player.replaceCurrentItem(with: playerItems[currentIndex])
         updateNowPlayingInfo()
         
-        eventSink?(["type": "playlistChanged", "data": items])
+        let playlistData = items.map { item -> [String: Any] in
+            var mappedItem = [String: Any]()
+            mappedItem["id"] = item["id"]
+            mappedItem["title"] = item["title"]
+            mappedItem["artist"] = item["artist"]
+            mappedItem["album"] = item["album"]
+            mappedItem["duration"] = item["duration"]
+            mappedItem["artworkUrl"] = item["artworkUrl"]
+            mappedItem["url"] = item["url"]
+            return mappedItem
+        }
+        eventSink?(["type": "playlistChanged", "data": playlistData])
         
         for item in items {
             if let artworkUrlString = item["artworkUrl"] as? String,
@@ -305,7 +320,17 @@ class MediaPlayerHandler: NSObject {
         player.replaceCurrentItem(with: playerItems[currentIndex])
         play()
         
-        eventSink?(["type": "mediaItemChanged", "data": playlist[currentIndex]])
+        if let currentItem = playlist[safe: currentIndex] {
+            var mappedItem = [String: Any]()
+            mappedItem["id"] = currentItem["id"]
+            mappedItem["title"] = currentItem["title"]
+            mappedItem["artist"] = currentItem["artist"]
+            mappedItem["album"] = currentItem["album"]
+            mappedItem["duration"] = currentItem["duration"]
+            mappedItem["artworkUrl"] = currentItem["artworkUrl"]
+            mappedItem["url"] = currentItem["url"]
+            eventSink?(["type": "mediaItemChanged", "data": mappedItem])
+        }
     }
     
     func skipToPrevious() {
@@ -315,7 +340,17 @@ class MediaPlayerHandler: NSObject {
         player.replaceCurrentItem(with: playerItems[currentIndex])
         play()
         
-        eventSink?(["type": "mediaItemChanged", "data": playlist[currentIndex]])
+        if let currentItem = playlist[safe: currentIndex] {
+            var mappedItem = [String: Any]()
+            mappedItem["id"] = currentItem["id"]
+            mappedItem["title"] = currentItem["title"]
+            mappedItem["artist"] = currentItem["artist"]
+            mappedItem["album"] = currentItem["album"]
+            mappedItem["duration"] = currentItem["duration"]
+            mappedItem["artworkUrl"] = currentItem["artworkUrl"]
+            mappedItem["url"] = currentItem["url"]
+            eventSink?(["type": "mediaItemChanged", "data": mappedItem])
+        }
     }
     
     func setVolume(_ volume: Float) {
@@ -324,5 +359,11 @@ class MediaPlayerHandler: NSObject {
     
     deinit {
         NotificationCenter.default.removeObserver(self)
+    }
+}
+
+extension Array {
+    subscript(safe index: Index) -> Element? {
+        return indices.contains(index) ? self[index] : nil
     }
 } 
