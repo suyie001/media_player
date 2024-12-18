@@ -131,6 +131,7 @@ class MediaPlayerHandler: NSObject {
     }
     
     private func setupNotifications() {
+        // 监听播放完成
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handlePlaybackStateChanged),
@@ -138,6 +139,13 @@ class MediaPlayerHandler: NSObject {
             object: nil
         )
         
+        // 监听播放器状态
+        player.addObserver(self, forKeyPath: "timeControlStatus", options: [.new], context: nil)
+        
+        // 监听缓冲状态
+        player.addObserver(self, forKeyPath: "currentItem.loadedTimeRanges", options: [.new], context: nil)
+        
+        // 监听播放位置
         player.addPeriodicTimeObserver(
             forInterval: CMTime(seconds: 1, preferredTimescale: 1),
             queue: .main
@@ -145,12 +153,55 @@ class MediaPlayerHandler: NSObject {
             guard let self = self else { return }
             self.updateNowPlayingInfo()
             
+            // 发送播放位置
             let position = Int(time.seconds * 1000)
             self.eventSink?(["type": "positionChanged", "data": position])
         }
     }
     
+    override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
+        switch keyPath {
+        case "timeControlStatus":
+            // 监听播放器状态变化
+            if let player = object as? AVPlayer {
+                switch player.timeControlStatus {
+                case .paused:
+                    eventSink?(["type": "playbackStateChanged", "data": "paused"])
+                case .playing:
+                    eventSink?(["type": "playbackStateChanged", "data": "playing"])
+                case .waitingToPlayAtSpecifiedRate:
+                    eventSink?(["type": "playbackStateChanged", "data": "loading"])
+                @unknown default:
+                    break
+                }
+            }
+            
+        case "currentItem.loadedTimeRanges":
+            // 监听缓冲进度
+            if let player = object as? AVPlayer,
+               let timeRange = player.currentItem?.loadedTimeRanges.first?.timeRangeValue {
+                let bufferedDuration = timeRange.start.seconds + timeRange.duration.seconds
+                let totalDuration = player.currentItem?.duration.seconds ?? 0
+                let progress = totalDuration > 0 ? bufferedDuration / totalDuration : 0
+                
+                // 发送缓冲进度
+                eventSink?(["type": "bufferChanged", "data": progress])
+                
+                // 发送缓冲状态
+                let isBuffering = progress < 1.0 && player.timeControlStatus == .waitingToPlayAtSpecifiedRate
+                eventSink?(["type": "bufferingChanged", "data": isBuffering])
+            }
+            
+        default:
+            super.observeValue(forKeyPath: keyPath, of: object, change: change, context: context)
+        }
+    }
+    
     @objc private func handlePlaybackStateChanged() {
+        // 发送完成事件
+        eventSink?(["type": "completed", "data": true])
+        
+        // 自动播放下一曲
         if currentIndex < playlist.count - 1 {
             skipToNext()
         } else {
@@ -254,7 +305,17 @@ class MediaPlayerHandler: NSObject {
         playerItems = items.compactMap { item in
             guard let urlString = item["url"] as? String,
                   let url = URL(string: urlString) else { return nil }
-            return AVPlayerItem(url: url)
+            let playerItem = AVPlayerItem(url: url)
+            
+            // 监听加载状态
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(handleItemReadyToPlay(_:)),
+                name: .AVPlayerItemNewAccessLogEntry,
+                object: playerItem
+            )
+            
+            return playerItem
         }
         
         guard !playerItems.isEmpty else { return }
@@ -263,6 +324,7 @@ class MediaPlayerHandler: NSObject {
         player.replaceCurrentItem(with: playerItems[currentIndex])
         updateNowPlayingInfo()
         
+        // 发送播放列表变化事件
         let playlistData = items.map { item -> [String: Any] in
             var mappedItem = [String: Any]()
             mappedItem["id"] = item["id"]
@@ -276,6 +338,7 @@ class MediaPlayerHandler: NSObject {
         }
         eventSink?(["type": "playlistChanged", "data": playlistData])
         
+        // 预加载封面图
         for item in items {
             if let artworkUrlString = item["artworkUrl"] as? String,
                let artworkUrl = URL(string: artworkUrlString),
@@ -287,6 +350,14 @@ class MediaPlayerHandler: NSObject {
                     self.artworkCache[artworkUrlString] = artwork
                 }
             }
+        }
+    }
+    
+    @objc private func handleItemReadyToPlay(_ notification: Notification) {
+        if let playerItem = notification.object as? AVPlayerItem,
+           let duration = playerItem.asset.duration.seconds.isNaN ? nil : playerItem.asset.duration.seconds {
+            // 发送媒体时长
+            eventSink?(["type": "durationChanged", "data": Int(duration * 1000)])
         }
     }
     
@@ -358,6 +429,9 @@ class MediaPlayerHandler: NSObject {
     }
     
     deinit {
+        // 移除所有观察者
+        player.removeObserver(self, forKeyPath: "timeControlStatus")
+        player.removeObserver(self, forKeyPath: "currentItem.loadedTimeRanges")
         NotificationCenter.default.removeObserver(self)
     }
 }
