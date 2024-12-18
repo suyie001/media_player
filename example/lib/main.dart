@@ -59,7 +59,7 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
       MediaItem(
         id: '2',
-        title: '兔兔',
+        title: '视频项，暂时没有画面',
         url: 'http://oss-api-audio.zuidie.net/audio/MP4L/7f12cb0dc07148898ef5b949e84b2eb6.mp4',
         artist: 'Artist 2',
         album: 'Album 2',
@@ -88,15 +88,6 @@ class _MyHomePageState extends State<MyHomePage> {
         id: '5',
         title: '普通',
         url: 'http://oss-api-audio.zuidie.net/audio/MP3L/94703ba232f343a6b4a0c970c6eaa6d1.mp3',
-        artist: 'Artist 2',
-        album: '没出息',
-        duration: const Duration(minutes: 4, seconds: 15),
-        artworkUrl: 'https://rabbit-u.oss-cn-hangzhou.aliyuncs.com/uploadfile/20240702/666699915832905728.jpg',
-      ),
-      MediaItem(
-        id: '6',
-        title: '无损',
-        url: 'http://oss-api-audio.zuidie.net/audio/FLAC/94703ba232f343a6b4a0c970c6eaa6d1.flac',
         artist: 'Artist 2',
         album: '没出息',
         duration: const Duration(minutes: 4, seconds: 15),
@@ -158,6 +149,26 @@ class _MyHomePageState extends State<MyHomePage> {
       );
     });
     await _player.setPlaylist(playlist);
+  }
+
+  addMedia() {
+    _player.add(MediaItem(
+      id: '6',
+      title: '无损',
+      url: 'http://oss-api-audio.zuidie.net/audio/FLAC/94703ba232f343a6b4a0c970c6eaa6d1.flac',
+      artist: 'Artist 2',
+      album: '没出息',
+      duration: const Duration(minutes: 4, seconds: 15),
+      artworkUrl: 'https://rabbit-u.oss-cn-hangzhou.aliyuncs.com/uploadfile/20240702/666699915832905728.jpg',
+    ));
+  }
+
+  moveMedia(int from, int to) {
+    _player.move(from, to);
+  }
+
+  removeMedia(int index) {
+    _player.removeAt(index);
   }
 
   @override
@@ -237,13 +248,22 @@ class _MyHomePageState extends State<MyHomePage> {
           const SizedBox(height: 20),
           const Divider(),
           Expanded(
-            child: ListView.builder(
+            child: ReorderableListView.builder(
               itemCount: _playlist.length,
+              onReorder: (oldIndex, newIndex) {
+                setState(() {
+                  if (oldIndex < newIndex) {
+                    newIndex -= 1;
+                  }
+                  moveMedia(oldIndex, newIndex);
+                });
+              },
               itemBuilder: (context, index) {
                 final item = _playlist[index];
                 final isPlaying = item.id == _currentItem?.id;
 
                 return ListTile(
+                  key: ValueKey(item.id),
                   title: Text(
                     item.title,
                     style: TextStyle(
@@ -252,16 +272,41 @@ class _MyHomePageState extends State<MyHomePage> {
                   ),
                   subtitle: item.artist != null ? Text(item.artist!) : null,
                   leading: isPlaying ? const Icon(Icons.music_note, color: Colors.blue) : const SizedBox(width: 24),
+                  trailing: const Icon(Icons.drag_handle),
                   onTap: () async {
-                    await _player.setPlaylist(_playlist);
-                    for (var i = 0; i < index; i++) {
-                      await _player.skipToNext();
-                    }
+                    await _player.jumpTo(index);
                     await _player.play();
+                  },
+                  onLongPress: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('删除'),
+                        content: Text('是否删除 ${item.title}?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('取消'),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              removeMedia(index);
+                            },
+                            child: const Text('删除'),
+                          ),
+                        ],
+                      ),
+                    );
                   },
                 );
               },
             ),
+          ),
+          Row(
+            children: [
+              ElevatedButton(onPressed: addMedia, child: const Text('添加媒体')),
+            ],
           ),
         ],
       ),

@@ -100,4 +100,29 @@ class MediaPlayer {
   Future<MediaItem?> getCurrentMediaItem() {
     return MediaPlayerPlatform.instance.getCurrentMediaItem();
   }
+
+  /// 添加一个媒体项到播放列表
+  Future<void> add(MediaItem mediaItem) {
+    return MediaPlayerPlatform.instance.add(mediaItem);
+  }
+
+  /// 从播放列表中移除指定位置的媒体项
+  Future<void> removeAt(int index) {
+    return MediaPlayerPlatform.instance.removeAt(index);
+  }
+
+  /// 在指定位置插入一个媒体项
+  Future<void> insertAt(int index, MediaItem mediaItem) {
+    return MediaPlayerPlatform.instance.insertAt(index, mediaItem);
+  }
+
+  /// 移动播放列表中的媒体项
+  Future<void> move(int from, int to) {
+    return MediaPlayerPlatform.instance.move(from, to);
+  }
+
+  /// 跳转到指定位置的媒体项
+  Future<void> jumpTo(int index) {
+    return MediaPlayerPlatform.instance.jumpTo(index);
+  }
 }

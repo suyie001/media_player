@@ -80,4 +80,41 @@ class MethodChannelMediaPlayer extends MediaPlayerPlatform {
     final map = await methodChannel.invokeMethod<Map<dynamic, dynamic>>('getCurrentMediaItem');
     return map != null ? MediaItem.fromMap(Map<String, dynamic>.from(map)) : null;
   }
+
+  @override
+  Future<void> add(MediaItem mediaItem) {
+    return methodChannel.invokeMethod('add', {
+      'mediaItem': mediaItem.toMap(),
+    });
+  }
+
+  @override
+  Future<void> removeAt(int index) {
+    return methodChannel.invokeMethod('removeAt', {
+      'index': index,
+    });
+  }
+
+  @override
+  Future<void> insertAt(int index, MediaItem mediaItem) {
+    return methodChannel.invokeMethod('insertAt', {
+      'index': index,
+      'mediaItem': mediaItem.toMap(),
+    });
+  }
+
+  @override
+  Future<void> move(int from, int to) {
+    return methodChannel.invokeMethod('move', {
+      'from': from,
+      'to': to,
+    });
+  }
+
+  @override
+  Future<void> jumpTo(int index) {
+    return methodChannel.invokeMethod('jumpTo', {
+      'index': index,
+    });
+  }
 }

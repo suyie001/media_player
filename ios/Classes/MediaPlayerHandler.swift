@@ -438,6 +438,120 @@ class MediaPlayerHandler: NSObject {
         player.volume = volume
     }
     
+    // MARK: - Playlist Operations
+    
+    func add(_ mediaItem: [String: Any]) {
+        playlist.append(mediaItem)
+        if let urlString = mediaItem["url"] as? String,
+           let url = URL(string: urlString) {
+            let playerItem = AVPlayerItem(url: url)
+            playerItems.append(playerItem)
+            
+            // 如果是第一个项目，直接开始播放
+            if playlist.count == 1 {
+                currentIndex = 0
+                player.replaceCurrentItem(with: playerItem)
+                updateNowPlayingInfo()
+            }
+            
+            // 发送播放列表变化事件
+            let playlistData = playlist.map { createMediaItemMap(from: $0) }
+            eventSink?(["type": "playlistChanged", "data": playlistData])
+        }
+    }
+    
+    func removeAt(_ index: Int) {
+        guard index >= 0 && index < playlist.count else { return }
+        
+        playlist.remove(at: index)
+        playerItems.remove(at: index)
+        
+        // 如果移除的是当前播放项
+        if index == currentIndex {
+            if playlist.isEmpty {
+                currentIndex = 0
+                player.replaceCurrentItem(with: nil)
+            } else {
+                currentIndex = min(index, playlist.count - 1)
+                player.replaceCurrentItem(with: playerItems[currentIndex])
+                updateNowPlayingInfo()
+                // 发送当前媒体项变化事件
+                if let currentItem = playlist[safe: currentIndex] {
+                    eventSink?(["type": "mediaItemChanged", "data": createMediaItemMap(from: currentItem)])
+                }
+            }
+        } else if index < currentIndex {
+            currentIndex -= 1
+        }
+        
+        // 发送播放列表变化事件
+        let playlistData = playlist.map { createMediaItemMap(from: $0) }
+        eventSink?(["type": "playlistChanged", "data": playlistData])
+    }
+    
+    func insertAt(_ index: Int, mediaItem: [String: Any]) {
+        guard index >= 0 && index <= playlist.count else { return }
+        
+        playlist.insert(mediaItem, at: index)
+        if let urlString = mediaItem["url"] as? String,
+           let url = URL(string: urlString) {
+            let playerItem = AVPlayerItem(url: url)
+            playerItems.insert(playerItem, at: index)
+            
+            // 如果插入位置在当前播放项之前或当前位置
+            if index <= currentIndex {
+                currentIndex += 1
+            }
+            
+            // 如果是第一个项目，直接开始播放
+            if playlist.count == 1 {
+                currentIndex = 0
+                player.replaceCurrentItem(with: playerItem)
+                updateNowPlayingInfo()
+            }
+            
+            // 发送播放列表变化事件
+            let playlistData = playlist.map { createMediaItemMap(from: $0) }
+            eventSink?(["type": "playlistChanged", "data": playlistData])
+        }
+    }
+    
+    func move(_ from: Int, _ to: Int) {
+        guard from >= 0 && from < playlist.count && to >= 0 && to < playlist.count else { return }
+        
+        let mediaItem = playlist.remove(at: from)
+        let playerItem = playerItems.remove(at: from)
+        
+        playlist.insert(mediaItem, at: to)
+        playerItems.insert(playerItem, at: to)
+        
+        // 更新当前索引
+        if currentIndex == from {
+            currentIndex = to
+        } else if from < currentIndex && to >= currentIndex {
+            currentIndex -= 1
+        } else if from > currentIndex && to <= currentIndex {
+            currentIndex += 1
+        }
+        
+        // 发送播放列表变化事件
+        let playlistData = playlist.map { createMediaItemMap(from: $0) }
+        eventSink?(["type": "playlistChanged", "data": playlistData])
+    }
+    
+    func jumpTo(_ index: Int) {
+        guard index >= 0 && index < playlist.count else { return }
+        
+        currentIndex = index
+        player.replaceCurrentItem(with: playerItems[currentIndex])
+        play()
+        
+        // 发送当前媒体项变化事件
+        if let currentItem = playlist[safe: currentIndex] {
+            eventSink?(["type": "mediaItemChanged", "data": createMediaItemMap(from: currentItem)])
+        }
+    }
+    
     deinit {
         // 移除所有观察者
         player.removeObserver(self, forKeyPath: "timeControlStatus")

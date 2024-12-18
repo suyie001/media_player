@@ -41,7 +41,7 @@ class MediaItem {
         artworkUrl: map['artworkUrl'],
       );
 
-  /// 创建一个新的 MediaItem，可以选择性地更新某些字段
+  /// 创建一个新的 MediaItem，可以选择性地��新某些字段
   MediaItem copyWith({
     String? id,
     String? title,
@@ -138,5 +138,30 @@ abstract class MediaPlayerPlatform extends PlatformInterface {
   /// 获取当前播放项
   Future<MediaItem?> getCurrentMediaItem() {
     throw UnimplementedError('getCurrentMediaItem() has not been implemented.');
+  }
+
+  /// 添加一个媒体项到播放列表
+  Future<void> add(MediaItem mediaItem) {
+    throw UnimplementedError('add() has not been implemented.');
+  }
+
+  /// 从播放列表中移除指定位置的媒体项
+  Future<void> removeAt(int index) {
+    throw UnimplementedError('removeAt() has not been implemented.');
+  }
+
+  /// 在指定位置插入一个媒体项
+  Future<void> insertAt(int index, MediaItem mediaItem) {
+    throw UnimplementedError('insertAt() has not been implemented.');
+  }
+
+  /// 移动播放列表中的媒体项
+  Future<void> move(int from, int to) {
+    throw UnimplementedError('move() has not been implemented.');
+  }
+
+  /// 跳转到指定位置的媒体项
+  Future<void> jumpTo(int index) {
+    throw UnimplementedError('jumpTo() has not been implemented.');
   }
 }

@@ -29,6 +29,63 @@ public class MediaPlayerPlugin: NSObject, FlutterPlugin {
             mediaPlayer.setPlaylist(playlist)
             result(nil)
             
+        case "add":
+            guard let args = call.arguments as? [String: Any],
+                  let mediaItem = args["mediaItem"] as? [String: Any] else {
+                result(FlutterError(code: "INVALID_ARGUMENT",
+                                  message: "MediaItem is required",
+                                  details: nil))
+                return
+            }
+            mediaPlayer.add(mediaItem)
+            result(nil)
+            
+        case "removeAt":
+            guard let args = call.arguments as? [String: Any],
+                  let index = args["index"] as? Int else {
+                result(FlutterError(code: "INVALID_ARGUMENT",
+                                  message: "Index is required",
+                                  details: nil))
+                return
+            }
+            mediaPlayer.removeAt(index)
+            result(nil)
+            
+        case "insertAt":
+            guard let args = call.arguments as? [String: Any],
+                  let index = args["index"] as? Int,
+                  let mediaItem = args["mediaItem"] as? [String: Any] else {
+                result(FlutterError(code: "INVALID_ARGUMENT",
+                                  message: "Index and mediaItem are required",
+                                  details: nil))
+                return
+            }
+            mediaPlayer.insertAt(index, mediaItem: mediaItem)
+            result(nil)
+            
+        case "move":
+            guard let args = call.arguments as? [String: Any],
+                  let from = args["from"] as? Int,
+                  let to = args["to"] as? Int else {
+                result(FlutterError(code: "INVALID_ARGUMENT",
+                                  message: "From and to indices are required",
+                                  details: nil))
+                return
+            }
+            mediaPlayer.move(from, to)
+            result(nil)
+            
+        case "jumpTo":
+            guard let args = call.arguments as? [String: Any],
+                  let index = args["index"] as? Int else {
+                result(FlutterError(code: "INVALID_ARGUMENT",
+                                  message: "Index is required",
+                                  details: nil))
+                return
+            }
+            mediaPlayer.jumpTo(index)
+            result(nil)
+            
         case "play":
             mediaPlayer.play()
             result(nil)
