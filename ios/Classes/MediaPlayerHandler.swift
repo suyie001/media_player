@@ -223,6 +223,7 @@ class MediaPlayerHandler: NSObject {
                 if let currentItem = playlist[safe: currentIndex] {
                     eventSink?(["type": "mediaItemChanged", "data": createMediaItemMap(from: currentItem)])
                 }
+                return
             } else {
                 skipToNext()
             }
@@ -490,10 +491,12 @@ class MediaPlayerHandler: NSObject {
                 if playMode == .all {
                     // 列表循环模式下，从头开始
                     currentIndex = 0
+                    // 直接跳出,避免执行 currentIndex += 1
+                    break
                 } else {
                     return
                 }
-                return
+                 
             }
             currentIndex += 1
         }
@@ -526,10 +529,11 @@ class MediaPlayerHandler: NSObject {
                 if playMode == .all {
                     // 列表循环模式下，跳到最后一首
                     currentIndex = playerItems.count - 1
+                    // 直接跳出,避免执行 currentIndex -= 1
+                    break
                 } else {
                     return
                 }
-                return
             }
             currentIndex -= 1
         }
