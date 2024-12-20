@@ -9,8 +9,18 @@ class MediaPlayerHandler: NSObject {
     private var currentIndex: Int = 0
     private var playlist: [[String: Any]] = []
     private var artworkCache: [String: MPMediaItemArtwork] = [:]
+    private var playMode: PlayMode = .list // 默认列表模式
+    private var playHistory: [Int] = [] // 用于记录播放历史，支持随机模式下的上一曲功能
     
     private var eventSink: FlutterEventSink?
+    
+    // 播放模式枚举
+    enum PlayMode: String {
+        case all    // 列表循环
+        case list   // 列表播放一次
+        case one    // 单曲循环
+        case shuffle // 随机播放
+    }
     
     override init() {
         player = AVPlayer()
@@ -201,11 +211,52 @@ class MediaPlayerHandler: NSObject {
         // 发送完成事件
         eventSink?(["type": "completed", "data": true])
         
-        // 自动播放下一曲
-        if currentIndex < playlist.count - 1 {
-            skipToNext()
-        } else {
-            eventSink?(["type": "playbackStateChanged", "data": "completed"])
+        // 根据不同的播放模式处理播放完成后的行为
+        switch playMode {
+        case .all:
+            // 列表循环：如果是最后一项，则从头开始
+            if currentIndex >= playlist.count - 1 {
+                currentIndex = 0
+                player.replaceCurrentItem(with: playerItems[currentIndex])
+                player.seek(to: .zero)
+                play()
+                if let currentItem = playlist[safe: currentIndex] {
+                    eventSink?(["type": "mediaItemChanged", "data": createMediaItemMap(from: currentItem)])
+                }
+            } else {
+                skipToNext()
+            }
+            
+        case .list:
+            // 列表播放：如果不是最后一项则播放下一项，是最后一项则停止
+            if currentIndex < playlist.count - 1 {
+                skipToNext()
+            } else {
+                eventSink?(["type": "playbackStateChanged", "data": "completed"])
+            }
+            
+        case .one:
+            // 单曲循环：重新从头播放当前歌曲
+            player.seek(to: .zero)
+            play()
+            
+        case .shuffle:
+            // 随机播放：随机选择一首（排除当前播放的）
+            if playlist.count > 1 {
+                var nextIndex: Int
+                repeat {
+                    nextIndex = Int.random(in: 0..<playlist.count)
+                } while nextIndex == currentIndex
+                
+                playHistory.append(currentIndex)
+                currentIndex = nextIndex
+                player.replaceCurrentItem(with: playerItems[currentIndex])
+                player.seek(to: .zero)
+                play()
+                if let currentItem = playlist[safe: currentIndex] {
+                    eventSink?(["type": "mediaItemChanged", "data": createMediaItemMap(from: currentItem)])
+                }
+            }
         }
     }
     
@@ -322,33 +373,17 @@ class MediaPlayerHandler: NSObject {
         
         currentIndex = 0
         player.replaceCurrentItem(with: playerItems[currentIndex])
+        // 确保从头开始播放
+        player.seek(to: .zero)
         updateNowPlayingInfo()
         
         // 发送播放列表变化事件
-        let playlistData = items.map { item -> [String: Any] in
-            var mappedItem = [String: Any]()
-            mappedItem["id"] = item["id"]
-            mappedItem["title"] = item["title"]
-            mappedItem["artist"] = item["artist"]
-            mappedItem["album"] = item["album"]
-            mappedItem["duration"] = item["duration"]
-            mappedItem["artworkUrl"] = item["artworkUrl"]
-            mappedItem["url"] = item["url"]
-            return mappedItem
-        }
+        let playlistData = playlist.map { createMediaItemMap(from: $0) }
         eventSink?(["type": "playlistChanged", "data": playlistData])
         
         // 发送当前媒体项变化事件
         if let currentItem = playlist[safe: currentIndex] {
-            var mappedItem = [String: Any]()
-            mappedItem["id"] = currentItem["id"]
-            mappedItem["title"] = currentItem["title"]
-            mappedItem["artist"] = currentItem["artist"]
-            mappedItem["album"] = currentItem["album"]
-            mappedItem["duration"] = currentItem["duration"]
-            mappedItem["artworkUrl"] = currentItem["artworkUrl"]
-            mappedItem["url"] = currentItem["url"]
-            eventSink?(["type": "mediaItemChanged", "data": mappedItem])
+            eventSink?(["type": "mediaItemChanged", "data": createMediaItemMap(from: currentItem)])
         }
         
         // 预加载封面图
@@ -411,10 +446,42 @@ class MediaPlayerHandler: NSObject {
     }
     
     func skipToNext() {
-        guard currentIndex < playerItems.count - 1 else { return }
+        switch playMode {
+        case .shuffle:
+            guard playlist.count > 1 else { return }
+            
+            // 记录当前索引到历史
+            playHistory.append(currentIndex)
+            
+            // 随机选择下一首（排除当前播放的）
+            var nextIndex: Int
+            repeat {
+                nextIndex = Int.random(in: 0..<playlist.count)
+            } while nextIndex == currentIndex
+            
+            currentIndex = nextIndex
+            
+        case .all, .list:
+            guard currentIndex < playerItems.count - 1 else {
+                if playMode == .all {
+                    // 列表循环模式下，从头开始
+                    currentIndex = 0
+                } else {
+                    return
+                }
+                return
+            }
+            currentIndex += 1
+            
+        case .one:
+            // 单曲循环模式下，next 等同于从头播放当前歌曲
+            player.seek(to: .zero)
+            play()
+            return
+        }
         
-        currentIndex += 1
         player.replaceCurrentItem(with: playerItems[currentIndex])
+        player.seek(to: .zero)
         play()
         
         if let currentItem = playlist[safe: currentIndex] {
@@ -423,10 +490,37 @@ class MediaPlayerHandler: NSObject {
     }
     
     func skipToPrevious() {
-        guard currentIndex > 0 else { return }
+        switch playMode {
+        case .shuffle:
+            // 从历史记录中获取上一首
+            if let previousIndex = playHistory.popLast() {
+                currentIndex = previousIndex
+            } else {
+                // 如果没有历史记录，则保持当前索引
+                return
+            }
+            
+        case .all, .list:
+            guard currentIndex > 0 else {
+                if playMode == .all {
+                    // 列表循环模式下，跳到最后一首
+                    currentIndex = playerItems.count - 1
+                } else {
+                    return
+                }
+                return
+            }
+            currentIndex -= 1
+            
+        case .one:
+            // 单曲循环模式下，previous 等同于从头播放当前歌曲
+            player.seek(to: .zero)
+            play()
+            return
+        }
         
-        currentIndex -= 1
         player.replaceCurrentItem(with: playerItems[currentIndex])
+        player.seek(to: .zero)
         play()
         
         if let currentItem = playlist[safe: currentIndex] {
@@ -451,6 +545,8 @@ class MediaPlayerHandler: NSObject {
             if playlist.count == 1 {
                 currentIndex = 0
                 player.replaceCurrentItem(with: playerItem)
+                // 确保从头开始播放
+                player.seek(to: .zero)
                 updateNowPlayingInfo()
             }
             
@@ -507,6 +603,8 @@ class MediaPlayerHandler: NSObject {
             if playlist.count == 1 {
                 currentIndex = 0
                 player.replaceCurrentItem(with: playerItem)
+                // 确保从头开始播放
+                player.seek(to: .zero)
                 updateNowPlayingInfo()
             }
             
@@ -544,12 +642,30 @@ class MediaPlayerHandler: NSObject {
         
         currentIndex = index
         player.replaceCurrentItem(with: playerItems[currentIndex])
+        // 确保从头开始播放
+        player.seek(to: .zero)
         play()
         
         // 发送当前媒体项变化事件
         if let currentItem = playlist[safe: currentIndex] {
             eventSink?(["type": "mediaItemChanged", "data": createMediaItemMap(from: currentItem)])
         }
+    }
+    
+    func setPlayMode(_ mode: String) {
+        if let newMode = PlayMode(rawValue: mode) {
+            playMode = newMode
+            // 切换到随机模式时清空历史记录
+            if newMode == .shuffle {
+                playHistory.removeAll()
+            }
+            // 发送播放模式变化事件
+            eventSink?(["type": "playModeChanged", "data": mode])
+        }
+    }
+    
+    func getPlayMode() -> String {
+        return playMode.rawValue
     }
     
     deinit {

@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:media_player/media_player.dart';
 import 'package:media_player/media_player_platform_interface.dart';
@@ -173,142 +175,175 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
+    IconData playModeIcon = Icons.list;
+    // switch (_player.playMode) {
+    //   case PlayMode.shuffle:
+    //     playModeIcon = Icons.shuffle;
+    //     break;
+    //   case PlayMode.one:
+    //     playModeIcon = Icons.repeat;
+    //     break;
+    // }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Media Player Demo'),
       ),
-      body: Column(
-        children: [
-          // 当前播放项信息
-          if (_currentItem != null) ...[
-            const SizedBox(height: 20),
-            Text(
-              _currentItem!.title,
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            if (_currentItem!.artist != null)
+      body: SafeArea(
+        child: Column(
+          children: [
+            // 当前播放项信息
+            if (_currentItem != null) ...[
+              const SizedBox(height: 20),
               Text(
-                _currentItem!.artist!,
-                style: Theme.of(context).textTheme.titleMedium,
+                _currentItem!.title,
+                style: Theme.of(context).textTheme.headlineSmall,
               ),
-          ],
+              if (_currentItem!.artist != null)
+                Text(
+                  _currentItem!.artist!,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+            ],
 
-          // 进度条
-          if (_duration != Duration.zero) ...[
-            const SizedBox(height: 20),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  Text(_formatDuration(_position)),
-                  Expanded(
-                    child: Slider(
-                      value: _position.inMilliseconds.toDouble(),
-                      max: _duration.inMilliseconds.toDouble(),
-                      onChanged: (value) {
-                        _player.seekTo(Duration(milliseconds: value.toInt()));
-                      },
+            // 进度条
+            if (_duration != Duration.zero) ...[
+              const SizedBox(height: 20),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    Text(_formatDuration(_position)),
+                    Expanded(
+                      child: Slider(
+                        value: min(_duration.inMilliseconds.toDouble(), _position.inMilliseconds.toDouble()),
+                        max: _duration.inMilliseconds.toDouble(),
+                        onChanged: (value) {
+                          _player.seekTo(Duration(milliseconds: value.toInt()));
+                        },
+                      ),
                     ),
-                  ),
-                  Text(_formatDuration(_duration)),
-                ],
+                    Text(_formatDuration(_duration)),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
 
-          // 控制按钮
-          const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.skip_previous),
-                onPressed: _player.skipToPrevious,
-              ),
-              const SizedBox(width: 16),
-              IconButton(
-                icon: Icon(_playbackState == PlaybackState.playing ? Icons.pause : Icons.play_arrow),
-                onPressed: () {
-                  if (_playbackState == PlaybackState.playing) {
-                    _player.pause();
-                  } else {
-                    _player.play();
-                  }
+            // 控制按钮
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(playModeIcon),
+                IconButton(
+                  icon: const Icon(Icons.skip_previous),
+                  onPressed: _player.skipToPrevious,
+                ),
+                const SizedBox(width: 16),
+                IconButton(
+                  icon: Icon(_playbackState == PlaybackState.playing ? Icons.pause : Icons.play_arrow),
+                  onPressed: () {
+                    if (_playbackState == PlaybackState.playing) {
+                      _player.pause();
+                    } else {
+                      _player.play();
+                    }
+                  },
+                ),
+                const SizedBox(width: 16),
+                IconButton(
+                  icon: const Icon(Icons.skip_next),
+                  onPressed: _player.skipToNext,
+                ),
+              ],
+            ),
+
+            // 播放列表
+            const SizedBox(height: 20),
+            const Divider(),
+            Expanded(
+              child: ReorderableListView.builder(
+                itemCount: _playlist.length,
+                onReorder: (oldIndex, newIndex) {
+                  setState(() {
+                    if (oldIndex < newIndex) {
+                      newIndex -= 1;
+                    }
+                    moveMedia(oldIndex, newIndex);
+                  });
+                },
+                itemBuilder: (context, index) {
+                  final item = _playlist[index];
+                  final isPlaying = item.id == _currentItem?.id;
+
+                  return ListTile(
+                    key: ValueKey(item.id),
+                    title: Text(
+                      item.title,
+                      style: TextStyle(
+                        fontWeight: isPlaying ? FontWeight.bold : null,
+                      ),
+                    ),
+                    subtitle: item.artist != null ? Text(item.artist!) : null,
+                    leading: isPlaying ? const Icon(Icons.music_note, color: Colors.blue) : const SizedBox(width: 24),
+                    trailing: const Icon(Icons.drag_handle),
+                    onTap: () async {
+                      await _player.jumpTo(index);
+                      await _player.play();
+                    },
+                    onLongPress: () {
+                      showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('删除'),
+                          content: Text('是否删除 ${item.title}?'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('取消'),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                removeMedia(index);
+                              },
+                              child: const Text('删除'),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  );
                 },
               ),
-              const SizedBox(width: 16),
-              IconButton(
-                icon: const Icon(Icons.skip_next),
-                onPressed: _player.skipToNext,
-              ),
-            ],
-          ),
-
-          // 播放列表
-          const SizedBox(height: 20),
-          const Divider(),
-          Expanded(
-            child: ReorderableListView.builder(
-              itemCount: _playlist.length,
-              onReorder: (oldIndex, newIndex) {
-                setState(() {
-                  if (oldIndex < newIndex) {
-                    newIndex -= 1;
-                  }
-                  moveMedia(oldIndex, newIndex);
-                });
-              },
-              itemBuilder: (context, index) {
-                final item = _playlist[index];
-                final isPlaying = item.id == _currentItem?.id;
-
-                return ListTile(
-                  key: ValueKey(item.id),
-                  title: Text(
-                    item.title,
-                    style: TextStyle(
-                      fontWeight: isPlaying ? FontWeight.bold : null,
-                    ),
-                  ),
-                  subtitle: item.artist != null ? Text(item.artist!) : null,
-                  leading: isPlaying ? const Icon(Icons.music_note, color: Colors.blue) : const SizedBox(width: 24),
-                  trailing: const Icon(Icons.drag_handle),
-                  onTap: () async {
-                    await _player.jumpTo(index);
-                    await _player.play();
-                  },
-                  onLongPress: () {
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('删除'),
-                        content: Text('是否删除 ${item.title}?'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('取消'),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              Navigator.pop(context);
-                              removeMedia(index);
-                            },
-                            child: const Text('删除'),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                );
-              },
             ),
-          ),
-          Row(
-            children: [
-              ElevatedButton(onPressed: addMedia, child: const Text('添加媒体')),
-            ],
-          ),
-        ],
+            Row(
+              children: [
+                ElevatedButton(onPressed: addMedia, child: const Text('添加媒体')),
+                IconButton(
+                    onPressed: () {
+                      _player.setPlayMode(PlayMode.shuffle);
+                    },
+                    icon: const Icon(Icons.shuffle)),
+                IconButton(
+                    onPressed: () {
+                      _player.setPlayMode(PlayMode.list);
+                    },
+                    icon: const Icon(Icons.list)),
+                IconButton(
+                    onPressed: () {
+                      _player.setPlayMode(PlayMode.one);
+                    },
+                    icon: const Icon(Icons.repeat)),
+                IconButton(
+                    onPressed: () {
+                      _player.setPlayMode(PlayMode.all);
+                    },
+                    icon: const Icon(Icons.all_inclusive)),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

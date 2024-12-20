@@ -117,4 +117,20 @@ class MethodChannelMediaPlayer extends MediaPlayerPlatform {
       'index': index,
     });
   }
+
+  @override
+  Future<void> setPlayMode(PlayMode mode) {
+    return methodChannel.invokeMethod('setPlayMode', {
+      'mode': mode.toString().split('.').last,
+    });
+  }
+
+  @override
+  Future<PlayMode> getPlayMode() async {
+    final mode = await methodChannel.invokeMethod<String>('getPlayMode');
+    return PlayMode.values.firstWhere(
+      (e) => e.toString().split('.').last == mode,
+      orElse: () => PlayMode.list,
+    );
+  }
 }

@@ -125,4 +125,14 @@ class MediaPlayer {
   Future<void> jumpTo(int index) {
     return MediaPlayerPlatform.instance.jumpTo(index);
   }
+
+  /// 设置播放模式
+  Future<void> setPlayMode(PlayMode mode) {
+    return MediaPlayerPlatform.instance.setPlayMode(mode);
+  }
+
+  /// 获取当前播放模式
+  Future<PlayMode> getPlayMode() {
+    return MediaPlayerPlatform.instance.getPlayMode();
+  }
 }

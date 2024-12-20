@@ -29,6 +29,20 @@ public class MediaPlayerPlugin: NSObject, FlutterPlugin {
             mediaPlayer.setPlaylist(playlist)
             result(nil)
             
+        case "setPlayMode":
+            guard let args = call.arguments as? [String: Any],
+                  let mode = args["mode"] as? String else {
+                result(FlutterError(code: "INVALID_ARGUMENT",
+                                  message: "Play mode is required",
+                                  details: nil))
+                return
+            }
+            mediaPlayer.setPlayMode(mode)
+            result(nil)
+            
+        case "getPlayMode":
+            result(mediaPlayer.getPlayMode())
+            
         case "add":
             guard let args = call.arguments as? [String: Any],
                   let mediaItem = args["mediaItem"] as? [String: Any] else {

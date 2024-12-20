@@ -41,7 +41,7 @@ class MediaItem {
         artworkUrl: map['artworkUrl'],
       );
 
-  /// 创建一个新的 MediaItem，可以选择性地��新某些字段
+  /// 创建一个新的 MediaItem，可以选择性地���新某些字段
   MediaItem copyWith({
     String? id,
     String? title,
@@ -65,6 +65,21 @@ class MediaItem {
 
 /// 播放状态枚举
 enum PlaybackState { none, loading, ready, playing, paused, completed, error }
+
+/// 播放模式枚举
+enum PlayMode {
+  /// 列表循环（播完最后一首后从头开始）
+  all,
+
+  /// 列表播放一次（播完最后一首后停止）
+  list,
+
+  /// 单曲循环
+  one,
+
+  /// 随机播放
+  shuffle
+}
 
 /// 平台接口抽象类
 abstract class MediaPlayerPlatform extends PlatformInterface {
@@ -163,5 +178,15 @@ abstract class MediaPlayerPlatform extends PlatformInterface {
   /// 跳转到指定位置的媒体项
   Future<void> jumpTo(int index) {
     throw UnimplementedError('jumpTo() has not been implemented.');
+  }
+
+  /// 设置播放模式
+  Future<void> setPlayMode(PlayMode mode) {
+    throw UnimplementedError('setPlayMode() has not been implemented.');
+  }
+
+  /// 获取当前播放模式
+  Future<PlayMode> getPlayMode() {
+    throw UnimplementedError('getPlayMode() has not been implemented.');
   }
 }
