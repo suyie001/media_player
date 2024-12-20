@@ -399,6 +399,9 @@ class MediaPlayerHandler: NSObject {
                 }
             }
         }
+        
+        // 更新远程控制按钮状态
+        updateRemoteCommandsState()
     }
     
     // 添加一个辅助方法来创建媒体项的映射
@@ -445,6 +448,27 @@ class MediaPlayerHandler: NSObject {
         player.seek(to: time)
     }
     
+    private func updateRemoteCommandsState() {
+        let commandCenter = MPRemoteCommandCenter.shared()
+        
+        switch playMode {
+        case .all:
+            // 列表循环模式：始终启用所有按钮，因为可以循环播放
+            commandCenter.nextTrackCommand.isEnabled = true
+            commandCenter.previousTrackCommand.isEnabled = true
+            
+        case .list:
+            // 列表播放模式：根据当前位置启用/禁用按钮
+            commandCenter.nextTrackCommand.isEnabled = currentIndex < playerItems.count - 1
+            commandCenter.previousTrackCommand.isEnabled = currentIndex > 0
+            
+        case .one, .shuffle:
+            // 单曲循环和随机播放模式：始终启用所有按钮
+            commandCenter.nextTrackCommand.isEnabled = true
+            commandCenter.previousTrackCommand.isEnabled = true
+        }
+    }
+    
     func skipToNext() {
         switch playMode {
         case .shuffle:
@@ -472,12 +496,6 @@ class MediaPlayerHandler: NSObject {
                 return
             }
             currentIndex += 1
-            
-        // case .one:
-        //     // 单曲循环模式下，next 等同于从头播放当前歌曲
-        //     player.seek(to: .zero)
-        //     play()
-        //     return
         }
         
         player.replaceCurrentItem(with: playerItems[currentIndex])
@@ -487,6 +505,9 @@ class MediaPlayerHandler: NSObject {
         if let currentItem = playlist[safe: currentIndex] {
             eventSink?(["type": "mediaItemChanged", "data": createMediaItemMap(from: currentItem)])
         }
+        
+        // 更新远程控制按钮状态
+        updateRemoteCommandsState()
     }
     
     func skipToPrevious() {
@@ -511,12 +532,6 @@ class MediaPlayerHandler: NSObject {
                 return
             }
             currentIndex -= 1
-            
-        // case .one:
-        //     // 单曲循环模式下，previous 等同于从头播放当前歌曲
-        //     player.seek(to: .zero)
-        //     play()
-        //     return
         }
         
         player.replaceCurrentItem(with: playerItems[currentIndex])
@@ -526,6 +541,9 @@ class MediaPlayerHandler: NSObject {
         if let currentItem = playlist[safe: currentIndex] {
             eventSink?(["type": "mediaItemChanged", "data": createMediaItemMap(from: currentItem)])
         }
+        
+        // 更新远程控制按钮状态
+        updateRemoteCommandsState()
     }
     
     func setVolume(_ volume: Float) {
@@ -661,6 +679,9 @@ class MediaPlayerHandler: NSObject {
             }
             // 发送播放模式变化事件
             eventSink?(["type": "playModeChanged", "data": mode])
+            
+            // 更新远程控制按钮状态
+            updateRemoteCommandsState()
         }
     }
     
