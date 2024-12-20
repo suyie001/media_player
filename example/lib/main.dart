@@ -38,6 +38,7 @@ class _MyHomePageState extends State<MyHomePage> {
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
   List<MediaItem> _playlist = [];
+  PlayMode _playMode = PlayMode.list;
 
   @override
   void initState() {
@@ -150,6 +151,15 @@ class _MyHomePageState extends State<MyHomePage> {
         SnackBar(content: Text('Error: $error')),
       );
     });
+
+    // 监听播放模式变化
+    _player.playModeStream.listen((mode) {
+      print('播放模式: ${mode.name}');
+      setState(() {
+        _playMode = mode;
+      });
+    });
+
     await _player.setPlaylist(playlist);
   }
 
@@ -175,15 +185,21 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    IconData playModeIcon = Icons.list;
-    // switch (_player.playMode) {
-    //   case PlayMode.shuffle:
-    //     playModeIcon = Icons.shuffle;
-    //     break;
-    //   case PlayMode.one:
-    //     playModeIcon = Icons.repeat;
-    //     break;
-    // }
+    IconData playModeIcon;
+    switch (_playMode) {
+      case PlayMode.all:
+        playModeIcon = Icons.all_inclusive;
+        break;
+      case PlayMode.list:
+        playModeIcon = Icons.list;
+        break;
+      case PlayMode.one:
+        playModeIcon = Icons.repeat_one;
+        break;
+      case PlayMode.shuffle:
+        playModeIcon = Icons.shuffle;
+        break;
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -234,7 +250,25 @@ class _MyHomePageState extends State<MyHomePage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(playModeIcon),
+                IconButton(
+                  icon: Icon(playModeIcon),
+                  onPressed: () {
+                    switch (_playMode) {
+                      case PlayMode.list:
+                        _player.setPlayMode(PlayMode.all);
+                        break;
+                      case PlayMode.all:
+                        _player.setPlayMode(PlayMode.one);
+                        break;
+                      case PlayMode.one:
+                        _player.setPlayMode(PlayMode.shuffle);
+                        break;
+                      case PlayMode.shuffle:
+                        _player.setPlayMode(PlayMode.list);
+                        break;
+                    }
+                  },
+                ),
                 IconButton(
                   icon: const Icon(Icons.skip_previous),
                   onPressed: _player.skipToPrevious,
@@ -257,8 +291,6 @@ class _MyHomePageState extends State<MyHomePage> {
                 ),
               ],
             ),
-
-            // 播放列表
             const SizedBox(height: 20),
             const Divider(),
             Expanded(
@@ -320,26 +352,6 @@ class _MyHomePageState extends State<MyHomePage> {
             Row(
               children: [
                 ElevatedButton(onPressed: addMedia, child: const Text('添加媒体')),
-                IconButton(
-                    onPressed: () {
-                      _player.setPlayMode(PlayMode.shuffle);
-                    },
-                    icon: const Icon(Icons.shuffle)),
-                IconButton(
-                    onPressed: () {
-                      _player.setPlayMode(PlayMode.list);
-                    },
-                    icon: const Icon(Icons.list)),
-                IconButton(
-                    onPressed: () {
-                      _player.setPlayMode(PlayMode.one);
-                    },
-                    icon: const Icon(Icons.repeat)),
-                IconButton(
-                    onPressed: () {
-                      _player.setPlayMode(PlayMode.all);
-                    },
-                    icon: const Icon(Icons.all_inclusive)),
               ],
             ),
           ],

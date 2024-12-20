@@ -28,6 +28,7 @@ enum MediaPlayerEventType {
   bufferChanged,
   bufferingChanged,
   errorOccurred,
+  playModeChanged,
   unknown,
 }
 
@@ -82,4 +83,11 @@ class MediaPlayerEventChannel {
 
   /// 获取错误流
   Stream<String> get errorStream => eventStream.where((event) => event.type == MediaPlayerEventType.errorOccurred).map((event) => event.data.toString());
+
+  /// 获取播放模式变化流
+  Stream<PlayMode> get playModeStream =>
+      eventStream.where((event) => event.type == MediaPlayerEventType.playModeChanged).map((event) => PlayMode.values.firstWhere(
+            (e) => e.toString().split('.').last == event.data,
+            orElse: () => PlayMode.list,
+          ));
 }

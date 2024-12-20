@@ -41,6 +41,9 @@ class MediaPlayer {
   /// 获取错误流
   Stream<String> get errorStream => _eventChannel.errorStream;
 
+  /// 获取播放模式变化流
+  Stream<PlayMode> get playModeStream => _eventChannel.playModeStream;
+
   /// 初始化播放器
   Future<void> initialize() {
     return MediaPlayerPlatform.instance.initialize();
