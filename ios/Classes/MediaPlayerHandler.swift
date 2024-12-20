@@ -461,7 +461,7 @@ class MediaPlayerHandler: NSObject {
             
             currentIndex = nextIndex
             
-        case .all, .list:
+        case .all, .list, .one:
             guard currentIndex < playerItems.count - 1 else {
                 if playMode == .all {
                     // 列表循环模式下，从头开始
@@ -473,11 +473,11 @@ class MediaPlayerHandler: NSObject {
             }
             currentIndex += 1
             
-        case .one:
-            // 单曲循环模式下，next 等同于从头播放当前歌曲
-            player.seek(to: .zero)
-            play()
-            return
+        // case .one:
+        //     // 单曲循环模式下，next 等同于从头播放当前歌曲
+        //     player.seek(to: .zero)
+        //     play()
+        //     return
         }
         
         player.replaceCurrentItem(with: playerItems[currentIndex])
@@ -500,7 +500,7 @@ class MediaPlayerHandler: NSObject {
                 return
             }
             
-        case .all, .list:
+        case .all, .list, .one:
             guard currentIndex > 0 else {
                 if playMode == .all {
                     // 列表循环模式下，跳到最后一首
@@ -512,11 +512,11 @@ class MediaPlayerHandler: NSObject {
             }
             currentIndex -= 1
             
-        case .one:
-            // 单曲循环模式下，previous 等同于从头播放当前歌曲
-            player.seek(to: .zero)
-            play()
-            return
+        // case .one:
+        //     // 单曲循环模式下，previous 等同于从头播放当前歌曲
+        //     player.seek(to: .zero)
+        //     play()
+        //     return
         }
         
         player.replaceCurrentItem(with: playerItems[currentIndex])
