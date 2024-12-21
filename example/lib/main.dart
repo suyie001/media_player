@@ -2,7 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:media_player/media_player.dart';
-import 'package:media_player/media_player_platform_interface.dart';
+// import 'package:media_player/media_player_platform_interface.dart';
 
 void main() {
   runApp(const MyApp());
@@ -32,6 +32,7 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
+  int _videoPlayerId = 0;
   final _player = MediaPlayer();
   MediaItem? _currentItem;
   PlaybackState _playbackState = PlaybackState.none;
@@ -210,6 +211,15 @@ class _MyHomePageState extends State<MyHomePage> {
           children: [
             // 当前播放项信息
             if (_currentItem != null) ...[
+              AspectRatio(
+                aspectRatio: 16 / 9, // 或其他适合的宽高比
+                child: VideoPlayerView(
+                  onPlatformViewCreated: (id) {
+                    print('videoPlayerId: $id');
+                    _videoPlayerId = id;
+                  },
+                ),
+              ),
               const SizedBox(height: 20),
               Text(
                 _currentItem!.title,

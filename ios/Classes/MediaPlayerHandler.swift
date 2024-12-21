@@ -4,7 +4,8 @@ import AVFoundation
 import MediaPlayer
 
 class MediaPlayerHandler: NSObject {
-    private var player: AVPlayer
+      // 将 player 改为 internal 访问级别
+    let player: AVPlayer
     private var playerItems: [AVPlayerItem] = []
     private var currentIndex: Int = 0
     private var playlist: [[String: Any]] = []
@@ -29,6 +30,16 @@ class MediaPlayerHandler: NSObject {
         setupAudioSession()
         setupRemoteTransportControls()
         setupNotifications()
+    }
+     // 实现 FlutterStreamHandler 协议
+    func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
+        eventSink = events
+        return nil
+    }
+    
+    func onCancel(withArguments arguments: Any?) -> FlutterError? {
+        eventSink = nil
+        return nil
     }
     
     private func setupAudioSession() {

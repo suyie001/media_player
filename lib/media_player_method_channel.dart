@@ -14,6 +14,10 @@ class MethodChannelMediaPlayer extends MediaPlayerPlatform {
     return methodChannel.invokeMethod('initialize');
   }
 
+  Future<int> videoPlayerId(int id) async {
+    return await methodChannel.invokeMethod('video_player_$id');
+  }
+
   @override
   Future<void> setPlaylist(List<MediaItem> playlist) {
     return methodChannel.invokeMethod('setPlaylist', {
