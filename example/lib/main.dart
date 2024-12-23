@@ -33,6 +33,7 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   int _videoPlayerId = 0;
+  bool _isVideoViewVisible = false;
   final _player = MediaPlayer();
   MediaItem? _currentItem;
   PlaybackState _playbackState = PlaybackState.none;
@@ -54,20 +55,20 @@ class _MyHomePageState extends State<MyHomePage> {
     final playlist = [
       MediaItem(
         id: '1',
-        title: 'Jazz in Paris',
-        url: 'https://storage.googleapis.com/exoplayer-test-media-0/Jazz_In_Paris.mp3',
-        artist: 'Artist 1',
-        album: 'Album 1',
-        duration: const Duration(minutes: 3, seconds: 30),
-        artworkUrl: 'https://rabbit-u.oss-cn-hangzhou.aliyuncs.com/uploadfile/20240702/666699915832905728.jpg',
-      ),
-      MediaItem(
-        id: '2',
         title: '花絮1',
         url: 'http://oss-api-audio.zuidie.net/audio/MP3L/637f0001a2b8485faf78460c2367d3cc.mp3',
         artist: 'Artist 2',
         album: '没出息',
         duration: const Duration(minutes: 4, seconds: 15),
+        artworkUrl: 'https://rabbit-u.oss-cn-hangzhou.aliyuncs.com/uploadfile/20240702/666699915832905728.jpg',
+      ),
+      MediaItem(
+        id: '2',
+        title: 'Jazz in Paris',
+        url: 'https://storage.googleapis.com/exoplayer-test-media-0/Jazz_In_Paris.mp3',
+        artist: 'Artist 1',
+        album: 'Album 1',
+        duration: const Duration(minutes: 3, seconds: 30),
         artworkUrl: 'https://rabbit-u.oss-cn-hangzhou.aliyuncs.com/uploadfile/20240702/666699915832905728.jpg',
       ),
       MediaItem(
@@ -211,15 +212,17 @@ class _MyHomePageState extends State<MyHomePage> {
           children: [
             // 当前播放项信息
             if (_currentItem != null) ...[
-              // AspectRatio(
-              //   aspectRatio: 16 / 9, // 或其他适合的宽高比
-              //   child: VideoPlayerView(
-              //     onPlatformViewCreated: (id) {
-              //       print('videoPlayerId: $id');
-              //       _videoPlayerId = id;
-              //     },
-              //   ),
-              // ),
+              if (_isVideoViewVisible)
+                AspectRatio(
+                  aspectRatio: 16 / 9, // 或其他适合的宽高比
+                  child: VideoPlayerView(
+                    onPlatformViewCreated: (id) {
+                      print('videoPlayerId: $id');
+                      _videoPlayerId = id;
+                      setState(() {});
+                    },
+                  ),
+                ),
               const SizedBox(height: 20),
               Text(
                 _currentItem!.title,
@@ -299,6 +302,21 @@ class _MyHomePageState extends State<MyHomePage> {
                   icon: const Icon(Icons.skip_next),
                   onPressed: _player.skipToNext,
                 ),
+                IconButton(
+                    onPressed: () async {
+                      if (_isVideoViewVisible == false) {
+                        await _player.showVideoView();
+                        setState(() {
+                          _isVideoViewVisible = true;
+                        });
+                      } else {
+                        // await _player.hideVideoView();
+                        setState(() {
+                          _isVideoViewVisible = false;
+                        });
+                      }
+                    },
+                    icon: const Icon(Icons.video_library))
               ],
             ),
             const SizedBox(height: 20),

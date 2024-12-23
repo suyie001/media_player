@@ -13,12 +13,13 @@ class VideoPlayerView extends StatelessWidget {
     // 根据平台返回不同的实现
     if (defaultTargetPlatform == TargetPlatform.iOS) {
       return UiKitView(
-        viewType: 'video_player_view',
+        viewType: 'media_player_video_view',
         creationParamsCodec: const StandardMessageCodec(),
         onPlatformViewCreated: (int id) {
           // 视图创建完成的回调
-          MethodChannelMediaPlayer().videoPlayerId(id);
+          // MethodChannelMediaPlayer().videoPlayerId(id);
           //todo id 通过回调传出去
+          onPlatformViewCreated(id);
         },
       );
     }

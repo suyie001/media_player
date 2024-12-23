@@ -204,6 +204,7 @@ class VideoPlayerView: NSObject, FlutterPlatformView {
     private let playerLayer: AVPlayerLayer
     private let containerView: UIView
     private var eventSink: FlutterEventSink?
+    private var playerObservation: NSKeyValueObservation?
     
     init(frame: CGRect, player: AVPlayer, eventSink: FlutterEventSink?) {
         containerView = UIView(frame: frame)
@@ -212,18 +213,91 @@ class VideoPlayerView: NSObject, FlutterPlatformView {
         super.init()
         
         setupView()
+        setupObservers()
     }
     
     private func setupView() {
+        // 确保视图背景透明
         containerView.backgroundColor = .clear
+        
+        // 设置自动布局
         containerView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         
+        // 配置播放器图层
         playerLayer.frame = containerView.bounds
         playerLayer.videoGravity = .resizeAspect
+        playerLayer.backgroundColor = UIColor.black.cgColor // 添加背景色以便于调试
+        
+        // 添加到视图层级
         containerView.layer.addSublayer(playerLayer)
+        
+        // 打印调试信息
+        print("Container view frame: \(containerView.frame)")
+        print("Player layer frame: \(playerLayer.frame)")
+    }
+    
+    private func setupObservers() {
+        // 观察播放器图层的就绪状态
+        playerObservation = playerLayer.observe(\.isReadyForDisplay) { [weak self] layer, _ in
+            print("Player layer ready for display: \(layer.isReadyForDisplay)")
+            if layer.isReadyForDisplay {
+                self?.handlePlayerReady()
+            }
+        }
+        
+        // 监听方向变化
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(orientationChanged),
+            name: UIDevice.orientationDidChangeNotification,
+            object: nil
+        )
+    }
+    
+    private func handlePlayerReady() {
+        // 确保在主线程更新 UI
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            // 更新布局
+            self.updateVideoLayout()
+            
+            // 通知 Flutter 端视频已就绪
+            self.eventSink?(["type": "videoReady"])
+        }
+    }
+    
+    @objc private func orientationChanged() {
+        updateVideoLayout()
+    }
+    
+    private func updateVideoLayout() {
+        // 确保在主线程更新布局
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            // 使用动画更新布局
+            CATransaction.begin()
+            CATransaction.setAnimationDuration(0.25)
+            
+            self.playerLayer.frame = self.containerView.bounds
+            
+            CATransaction.commit()
+            
+            // 打印更新后的布局信息
+            print("Updated container view frame: \(self.containerView.frame)")
+            print("Updated player layer frame: \(self.playerLayer.frame)")
+        }
     }
     
     func view() -> UIView {
         return containerView
+    }
+    
+    deinit {
+        // 清理观察者
+        playerObservation?.invalidate()
+        NotificationCenter.default.removeObserver(self)
+        print("VideoPlayerView deinit")
     }
 }
