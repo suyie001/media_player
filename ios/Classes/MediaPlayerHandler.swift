@@ -2,10 +2,13 @@ import Flutter
 import Foundation
 import AVFoundation
 import MediaPlayer
+import AVKit
 
-class MediaPlayerHandler: NSObject {
-      // 将 player 改为 internal 访问级别
+class MediaPlayerHandler: NSObject, FlutterStreamHandler {
+    static let shared = MediaPlayerHandler()
+    
     let player: AVPlayer
+    private var playerLayer: AVPlayerLayer?
     private var playerItems: [AVPlayerItem] = []
     private var currentIndex: Int = 0
     private var playlist: [[String: Any]] = []
@@ -14,6 +17,7 @@ class MediaPlayerHandler: NSObject {
     private var playHistory: [Int] = [] // 用于记录播放历史，支持随机模式下的上一曲功能
     
     private var eventSink: FlutterEventSink?
+    private var pipController: AVPictureInPictureController?
     
     // 播放模式枚举
     enum PlayMode: String {
@@ -27,9 +31,42 @@ class MediaPlayerHandler: NSObject {
         player = AVPlayer()
         super.init()
         
+        // 创建 playerLayer
+        playerLayer = AVPlayerLayer(player: player)
+        
+        // 设置音频会话
         setupAudioSession()
+        
+        // 启用后台播放
+        let audioSession = AVAudioSession.sharedInstance()
+        do {
+            try audioSession.setActive(true)
+            // 设置播放器在后台继续播放
+            player.automaticallyWaitsToMinimizeStalling = false
+            player.playImmediately(atRate: 1.0)
+        } catch {
+            print("Failed to set audio session active: \(error)")
+        }
+        
+        // 监听音频会话中断
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAudioSessionInterruption),
+            name: AVAudioSession.interruptionNotification,
+            object: nil
+        )
+        
+        // 监听音频路由变化
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAudioRouteChange),
+            name: AVAudioSession.routeChangeNotification,
+            object: nil
+        )
+        
         setupRemoteTransportControls()
         setupNotifications()
+        setupPictureInPicture()
     }
      // 实现 FlutterStreamHandler 协议
     func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
@@ -44,32 +81,32 @@ class MediaPlayerHandler: NSObject {
     
     private func setupAudioSession() {
         do {
-            try AVAudioSession.sharedInstance().setCategory(
+            let audioSession = AVAudioSession.sharedInstance()
+            
+            // 设置类别和选项
+            try audioSession.setCategory(
                 .playback,
-                mode: .default,
-                options: [.allowBluetooth, .allowBluetoothA2DP, .mixWithOthers]
-            )
-            try AVAudioSession.sharedInstance().setActive(true)
-            
-            NotificationCenter.default.addObserver(
-                self,
-                selector: #selector(handleInterruption),
-                name: AVAudioSession.interruptionNotification,
-                object: nil
+                mode: .moviePlayback,  // 使用 moviePlayback 模式以支持视频播放
+                options: [
+                    .allowAirPlay,
+                    .allowBluetooth,
+                    .allowBluetoothA2DP,
+                    .duckOthers,
+                    .mixWithOthers  // 允许与其他音频混合
+                ]
             )
             
-            NotificationCenter.default.addObserver(
-                self,
-                selector: #selector(handleRouteChange),
-                name: AVAudioSession.routeChangeNotification,
-                object: nil
-            )
+            // 设置活跃状态
+            try audioSession.setActive(true, options: [.notifyOthersOnDeactivation])
+            
+            print("Audio session setup successful")
         } catch {
-            print("Failed to set up audio session: \(error)")
+            print("Failed to setup audio session: \(error)")
+            eventSink?(["type": "error", "data": "Failed to setup audio session: \(error.localizedDescription)"])
         }
     }
     
-    @objc private func handleInterruption(notification: Notification) {
+    @objc private func handleAudioSessionInterruption(_ notification: Notification) {
         guard let userInfo = notification.userInfo,
               let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
               let type = AVAudioSession.InterruptionType(rawValue: typeValue) else {
@@ -78,21 +115,23 @@ class MediaPlayerHandler: NSObject {
         
         switch type {
         case .began:
+            // 音频被中断（如来电）
             pause()
         case .ended:
-            guard let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt else {
-                return
-            }
+            // 中断结束
+            guard let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt else { return }
             let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
+            
             if options.contains(.shouldResume) {
                 play()
             }
+            
         @unknown default:
             break
         }
     }
     
-    @objc private func handleRouteChange(notification: Notification) {
+    @objc private func handleAudioRouteChange(_ notification: Notification) {
         guard let userInfo = notification.userInfo,
               let reasonValue = userInfo[AVAudioSessionRouteChangeReasonKey] as? UInt,
               let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else {
@@ -101,6 +140,7 @@ class MediaPlayerHandler: NSObject {
         
         switch reason {
         case .oldDeviceUnavailable:
+        // 音频设备断开连接（如拔出耳机）
             pause()
         default:
             break
@@ -248,7 +288,7 @@ class MediaPlayerHandler: NSObject {
             }
             
         case .one:
-            // 单曲循环：重新从头播放当前歌曲
+            // 单曲循环：重新从播放当前歌曲
             player.seek(to: .zero)
             play()
             
@@ -438,9 +478,14 @@ class MediaPlayerHandler: NSObject {
     }
     
     func play() {
-        player.play()
-        updateNowPlayingInfo()
-        eventSink?(["type": "playbackStateChanged", "data": "playing"])
+        do {
+            try AVAudioSession.sharedInstance().setActive(true)
+            player.play()
+            updateNowPlayingInfo()
+            eventSink?(["type": "playbackStateChanged", "data": "playing"])
+        } catch {
+            print("Failed to activate audio session: \(error)")
+        }
     }
     
     func pause() {
@@ -604,7 +649,7 @@ class MediaPlayerHandler: NSObject {
                 currentIndex = min(index, playlist.count - 1)
                 player.replaceCurrentItem(with: playerItems[currentIndex])
                 updateNowPlayingInfo()
-                // 发送当前媒体项变化事件
+                // 发送当��媒体项变化事件
                 if let currentItem = playlist[safe: currentIndex] {
                     eventSink?(["type": "mediaItemChanged", "data": createMediaItemMap(from: currentItem)])
                 }
@@ -709,6 +754,13 @@ class MediaPlayerHandler: NSObject {
         player.removeObserver(self, forKeyPath: "timeControlStatus")
         player.removeObserver(self, forKeyPath: "currentItem.loadedTimeRanges")
         NotificationCenter.default.removeObserver(self)
+        
+        // 停用音频会话
+        do {
+            try AVAudioSession.sharedInstance().setActive(false)
+        } catch {
+            print("Failed to deactivate audio session: \(error)")
+        }
     }
     
     func updateCurrentUrl(_ urlString: String) {
@@ -723,6 +775,62 @@ class MediaPlayerHandler: NSObject {
         
         // 通知 Flutter 端 URL 已更新
         eventSink?(["type": "urlUpdated"])
+    }
+    
+    private func setupPictureInPicture() {
+        // 检查设备是否支持画中画
+        guard AVPictureInPictureController.isPictureInPictureSupported(),
+              let playerLayer = self.playerLayer else {
+            print("设备不支持画中画或 playerLayer 未初始化")
+            return
+        }
+        
+        // 创建画中画控制器
+        pipController = AVPictureInPictureController(playerLayer: playerLayer)
+        pipController?.delegate = self
+        
+        // 设置自动启动画中画
+        if #available(iOS 14.2, *) {
+            pipController?.canStartPictureInPictureAutomaticallyFromInline = true
+        }
+    }
+    
+    // 提供开始/停止画中画的方法
+    func startPictureInPicture() {
+        pipController?.startPictureInPicture()
+    }
+    
+    func stopPictureInPicture() {
+        pipController?.stopPictureInPicture()
+    }
+    
+    // 获取 playerLayer 的访问器方法
+    func getPlayerLayer() -> AVPlayerLayer? {
+        return playerLayer
+    }
+}
+
+// 添加画中画代理
+extension MediaPlayerHandler: AVPictureInPictureControllerDelegate {
+    func pictureInPictureControllerWillStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+        eventSink?(["type": "pipWillStart"])
+    }
+    
+    func pictureInPictureControllerDidStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+        eventSink?(["type": "pipDidStart"])
+    }
+    
+    func pictureInPictureControllerWillStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+        eventSink?(["type": "pipWillStop"])
+    }
+    
+    func pictureInPictureControllerDidStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+        eventSink?(["type": "pipDidStop"])
+    }
+    
+    func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, failedToStartPictureInPictureWithError error: Error) {
+        print("画中画启动失败: \(error)")
+        eventSink?(["type": "error", "data": "Failed to start PiP: \(error.localizedDescription)"])
     }
 }
 

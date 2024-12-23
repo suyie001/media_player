@@ -174,11 +174,21 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   }
 
   Future<void> checkoutToAudio() async {
+    Duration position = _position;
     await _player.updateCurrentUrl('http://oss-api-audio.zuidie.net/audio/MP3L/94703ba232f343a6b4a0c970c6eaa6d1.mp3');
+    await _player.seekTo(position);
   }
 
   Future<void> checkoutToVideo() async {
+    Duration position = _position;
     await _player.updateCurrentUrl('http://oss-api-audio.zuidie.net/audio/MP4L/7f12cb0dc07148898ef5b949e84b2eb6.mp4');
+    await _player.showVideoView();
+    setState(() {
+      _isVideoViewVisible = true;
+    });
+    await Future.delayed(const Duration(seconds: 1));
+    print('seekTo: $position');
+    await _player.seekTo(position);
   }
 
   moveMedia(int from, int to) {
@@ -310,10 +320,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                     onPressed: () async {
                       if (_isVideoViewVisible == false) {
                         await checkoutToVideo();
-                        await _player.showVideoView();
-                        setState(() {
-                          _isVideoViewVisible = true;
-                        });
                       } else {
                         await checkoutToAudio();
                         setState(() {

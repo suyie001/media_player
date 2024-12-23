@@ -154,4 +154,14 @@ class MethodChannelMediaPlayer extends MediaPlayerPlatform {
       'url': url,
     });
   }
+
+  @override
+  Future<void> startPictureInPicture() async {
+    await methodChannel.invokeMethod('startPictureInPicture');
+  }
+
+  @override
+  Future<void> stopPictureInPicture() async {
+    await methodChannel.invokeMethod('stopPictureInPicture');
+  }
 }

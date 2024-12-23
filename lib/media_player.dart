@@ -154,4 +154,12 @@ class MediaPlayer {
   Future<void> updateCurrentUrl(String url) async {
     return MediaPlayerPlatform.instance.updateCurrentUrl(url);
   }
+
+  Future<void> startPictureInPicture() async {
+    await MediaPlayerPlatform.instance.startPictureInPicture();
+  }
+
+  Future<void> stopPictureInPicture() async {
+    await MediaPlayerPlatform.instance.stopPictureInPicture();
+  }
 }

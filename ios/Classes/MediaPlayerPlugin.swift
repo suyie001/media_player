@@ -3,7 +3,7 @@ import UIKit
 import AVFoundation  // 添加这行
 
 public class MediaPlayerPlugin: NSObject, FlutterPlugin {
-    private let mediaPlayer = MediaPlayerHandler()
+    private let mediaPlayer = MediaPlayerHandler.shared
     private var videoViewFactory: MediaPlayerVideoViewFactory?
     private var eventSink: FlutterEventSink?
     private var registrar: FlutterPluginRegistrar?
@@ -21,7 +21,6 @@ public class MediaPlayerPlugin: NSObject, FlutterPlugin {
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         switch call.method {
         case "showVideoView":
-            // 创建并注册视频视图工厂
             if videoViewFactory == nil {
                 videoViewFactory = MediaPlayerVideoViewFactory(player: mediaPlayer.player)
                 registrar?.register(videoViewFactory!, withId: "media_player_video_view")
@@ -168,6 +167,14 @@ public class MediaPlayerPlugin: NSObject, FlutterPlugin {
             mediaPlayer.updateCurrentUrl(url)
             result(nil)
             
+        case "startPictureInPicture":
+            mediaPlayer.startPictureInPicture()
+            result(nil)
+            
+        case "stopPictureInPicture":
+            mediaPlayer.stopPictureInPicture()
+            result(nil)
+            
         default:
             result(FlutterMethodNotImplemented)
         }
@@ -207,16 +214,24 @@ class MediaPlayerVideoViewFactory: NSObject, FlutterPlatformViewFactory {
 }
 
 class VideoPlayerView: NSObject, FlutterPlatformView {
-    private let playerLayer: AVPlayerLayer
     private let containerView: UIView
     private var eventSink: FlutterEventSink?
     private var playerObservation: NSKeyValueObservation?
+    private let mediaPlayer: MediaPlayerHandler
     
     init(frame: CGRect, player: AVPlayer, eventSink: FlutterEventSink?) {
         containerView = UIView(frame: frame)
-        playerLayer = AVPlayerLayer(player: player)
         self.eventSink = eventSink
+        self.mediaPlayer = MediaPlayerHandler.shared // 需要添加一个 shared 实例
         super.init()
+        
+        // 设置后台播放
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
+        try? AVAudioSession.sharedInstance().setActive(true)
+        
+        // 允许画中画和后台播放
+        player.allowsExternalPlayback = true
+        player.preventsDisplaySleepDuringVideoPlayback = true
         
         setupView()
         setupObservers()
@@ -230,26 +245,40 @@ class VideoPlayerView: NSObject, FlutterPlatformView {
         containerView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         
         // 配置播放器图层
-        playerLayer.frame = containerView.bounds
-        playerLayer.videoGravity = .resizeAspect
-        playerLayer.backgroundColor = UIColor.black.cgColor // 添加背景色以便于调试
-        
-        // 添加到视图层级
-        containerView.layer.addSublayer(playerLayer)
-        
-        // 打印调试信息
-        print("Container view frame: \(containerView.frame)")
-        print("Player layer frame: \(playerLayer.frame)")
+        if let playerLayer = mediaPlayer.getPlayerLayer() {
+            playerLayer.frame = containerView.bounds
+            playerLayer.videoGravity = .resizeAspect
+            
+            // 添加到视图层级
+            containerView.layer.addSublayer(playerLayer)
+        }
     }
     
     private func setupObservers() {
         // 观察播放器图层的就绪状态
-        playerObservation = playerLayer.observe(\.isReadyForDisplay) { [weak self] layer, _ in
-            print("Player layer ready for display: \(layer.isReadyForDisplay)")
-            if layer.isReadyForDisplay {
-                self?.handlePlayerReady()
+        if let playerLayer = mediaPlayer.getPlayerLayer() {
+            playerObservation = playerLayer.observe(\.isReadyForDisplay) { [weak self] layer, _ in
+                if layer.isReadyForDisplay {
+                    self?.handlePlayerReady()
+                }
             }
         }
+        
+        // 监听应用进入后台
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleEnterBackground),
+            name: UIApplication.didEnterBackgroundNotification,
+            object: nil
+        )
+        
+        // 监听应用进入前台
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleEnterForeground),
+            name: UIApplication.willEnterForegroundNotification,
+            object: nil
+        )
         
         // 监听方向变化
         NotificationCenter.default.addObserver(
@@ -260,15 +289,21 @@ class VideoPlayerView: NSObject, FlutterPlatformView {
         )
     }
     
+    @objc private func handleEnterBackground() {
+        // 确保后台播放继续
+        try? AVAudioSession.sharedInstance().setActive(true)
+        mediaPlayer.player.play()
+    }
+    
+    @objc private func handleEnterForeground() {
+        // 更新视图布局
+        updateVideoLayout()
+    }
+    
     private func handlePlayerReady() {
-        // 确保在主线程更新 UI
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            
-            // 更新布局
             self.updateVideoLayout()
-            
-            // 通知 Flutter 端视频已就绪
             self.eventSink?(["type": "videoReady"])
         }
     }
@@ -278,21 +313,14 @@ class VideoPlayerView: NSObject, FlutterPlatformView {
     }
     
     private func updateVideoLayout() {
-        // 确保在主线程更新布局
         DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
+            guard let self = self,
+                  let playerLayer = self.mediaPlayer.getPlayerLayer() else { return }
             
-            // 使用动画更新布局
             CATransaction.begin()
             CATransaction.setAnimationDuration(0.25)
-            
-            self.playerLayer.frame = self.containerView.bounds
-            
+            playerLayer.frame = self.containerView.bounds
             CATransaction.commit()
-            
-            // 打印更新后的布局信息
-            print("Updated container view frame: \(self.containerView.frame)")
-            print("Updated player layer frame: \(self.playerLayer.frame)")
         }
     }
     
@@ -301,9 +329,7 @@ class VideoPlayerView: NSObject, FlutterPlatformView {
     }
     
     deinit {
-        // 清理观察者
         playerObservation?.invalidate()
         NotificationCenter.default.removeObserver(self)
-        print("VideoPlayerView deinit")
     }
 }
