@@ -775,6 +775,15 @@ class MediaPlayerHandler: NSObject, FlutterStreamHandler {
         
         // 通知 Flutter 端 URL 已更新
         eventSink?(["type": "urlUpdated"])
+
+        // 通知flutter端，当前媒体项变化
+        if let currentItem = playlist[safe: currentIndex] {
+            eventSink?(["type": "mediaItemChanged", "data": createMediaItemMap(from: currentItem)])
+        }
+        // 通知flutter端，当前媒体项时长变化
+        if let duration = playerItem.asset.duration.seconds.isNaN ? nil : playerItem.asset.duration.seconds {
+            eventSink?(["type": "durationChanged", "data": Int(duration * 1000)])
+        }
     }
     
     private func setupPictureInPicture() {
