@@ -137,4 +137,14 @@ class MethodChannelMediaPlayer extends MediaPlayerPlatform {
       orElse: () => PlayMode.list,
     );
   }
+
+  @override
+  Future<void> showVideoView() async {
+    await methodChannel.invokeMethod('showVideoView');
+  }
+
+  @override
+  Future<void> hideVideoView() async {
+    await methodChannel.invokeMethod('hideVideoView');
+  }
 }

@@ -63,19 +63,19 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
       MediaItem(
         id: '2',
-        title: '视频项，暂时没有画面',
-        url: 'http://oss-api-audio.zuidie.net/audio/MP4L/7f12cb0dc07148898ef5b949e84b2eb6.mp4',
+        title: '花絮1',
+        url: 'http://oss-api-audio.zuidie.net/audio/MP3L/637f0001a2b8485faf78460c2367d3cc.mp3',
         artist: 'Artist 2',
-        album: 'Album 2',
+        album: '没出息',
         duration: const Duration(minutes: 4, seconds: 15),
         artworkUrl: 'https://rabbit-u.oss-cn-hangzhou.aliyuncs.com/uploadfile/20240702/666699915832905728.jpg',
       ),
       MediaItem(
         id: '3',
-        title: '花絮1',
-        url: 'http://oss-api-audio.zuidie.net/audio/MP3L/637f0001a2b8485faf78460c2367d3cc.mp3',
+        title: '视频项，暂时没有画面',
+        url: 'http://oss-api-audio.zuidie.net/audio/MP4L/7f12cb0dc07148898ef5b949e84b2eb6.mp4',
         artist: 'Artist 2',
-        album: '没出息',
+        album: 'Album 2',
         duration: const Duration(minutes: 4, seconds: 15),
         artworkUrl: 'https://rabbit-u.oss-cn-hangzhou.aliyuncs.com/uploadfile/20240702/666699915832905728.jpg',
       ),
@@ -211,15 +211,15 @@ class _MyHomePageState extends State<MyHomePage> {
           children: [
             // 当前播放项信息
             if (_currentItem != null) ...[
-              AspectRatio(
-                aspectRatio: 16 / 9, // 或其他适合的宽高比
-                child: VideoPlayerView(
-                  onPlatformViewCreated: (id) {
-                    print('videoPlayerId: $id');
-                    _videoPlayerId = id;
-                  },
-                ),
-              ),
+              // AspectRatio(
+              //   aspectRatio: 16 / 9, // 或其他适合的宽高比
+              //   child: VideoPlayerView(
+              //     onPlatformViewCreated: (id) {
+              //       print('videoPlayerId: $id');
+              //       _videoPlayerId = id;
+              //     },
+              //   ),
+              // ),
               const SizedBox(height: 20),
               Text(
                 _currentItem!.title,

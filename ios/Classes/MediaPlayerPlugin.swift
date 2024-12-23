@@ -4,26 +4,35 @@ import AVFoundation  // 添加这行
 
 public class MediaPlayerPlugin: NSObject, FlutterPlugin {
     private let mediaPlayer = MediaPlayerHandler()
+    private var videoViewFactory: MediaPlayerVideoViewFactory?
+    private var eventSink: FlutterEventSink?
+    private var registrar: FlutterPluginRegistrar?
     
     public static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(name: "media_player", binaryMessenger: registrar.messenger())
         let eventChannel = FlutterEventChannel(name: "media_player_events", binaryMessenger: registrar.messenger())
         
         let instance = MediaPlayerPlugin()
-        let factory = VideoPlayerViewFactory(player: instance.mediaPlayer.player)
-        
-        // 注册视频视图工厂
-        registrar.register(
-            factory,
-            withId: "video_player_view"
-        )
-        
+        instance.registrar = registrar
         registrar.addMethodCallDelegate(instance, channel: channel)
         eventChannel.setStreamHandler(instance)
     }
     
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         switch call.method {
+        case "showVideoView":
+            // 创建并注册视频视图工厂
+            if videoViewFactory == nil {
+                videoViewFactory = MediaPlayerVideoViewFactory(player: mediaPlayer.player)
+                registrar?.register(videoViewFactory!, withId: "media_player_video_view")
+            }
+            result(nil)
+            
+        case "hideVideoView":
+            // 移除视频视图工厂
+            videoViewFactory = nil
+            result(nil)
+            
         case "initialize":
             result(nil)
             
@@ -151,6 +160,8 @@ public class MediaPlayerPlugin: NSObject, FlutterPlugin {
             mediaPlayer.setVolume(Float(volume))
             result(nil)
             
+    
+            
         default:
             result(FlutterMethodNotImplemented)
         }
@@ -171,165 +182,48 @@ extension MediaPlayerPlugin: FlutterStreamHandler {
     }
 }
 
-
-
-class VideoPlayerViewFactory: NSObject, FlutterPlatformViewFactory {
+class MediaPlayerVideoViewFactory: NSObject, FlutterPlatformViewFactory {
     private let player: AVPlayer
+    private var eventSink: FlutterEventSink?
     
     init(player: AVPlayer) {
         self.player = player
         super.init()
     }
     
-    func create(
-        withFrame frame: CGRect,
-        viewIdentifier viewId: Int64,
-        arguments args: Any?
-    ) -> FlutterPlatformView {
-        return VideoPlayerView(
-            frame: frame,
-            viewIdentifier: viewId,
-            player: player
-        )
+    func create(withFrame frame: CGRect, viewIdentifier viewId: Int64, arguments args: Any?) -> FlutterPlatformView {
+        return VideoPlayerView(frame: frame, player: player, eventSink: eventSink)
     }
     
-    // 支持创建参数编码
-    public func createArgsCodec() -> FlutterMessageCodec & NSObjectProtocol {
-        return FlutterStandardMessageCodec.sharedInstance()
+    func setEventSink(_ sink: FlutterEventSink?) {
+        self.eventSink = sink
     }
 }
 
 class VideoPlayerView: NSObject, FlutterPlatformView {
     private let playerLayer: AVPlayerLayer
     private let containerView: UIView
-    private var playerObservation: NSKeyValueObservation?
+    private var eventSink: FlutterEventSink?
     
-    init(frame: CGRect, viewIdentifier: Int64, player: AVPlayer) {
+    init(frame: CGRect, player: AVPlayer, eventSink: FlutterEventSink?) {
         containerView = UIView(frame: frame)
         playerLayer = AVPlayerLayer(player: player)
+        self.eventSink = eventSink
         super.init()
         
         setupView()
-        setupObservers()
     }
     
     private func setupView() {
-        // 配置容器视图
-        containerView.backgroundColor = .black
+        containerView.backgroundColor = .clear
         containerView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         
-        // 配置播放器图层
         playerLayer.frame = containerView.bounds
         playerLayer.videoGravity = .resizeAspect
         containerView.layer.addSublayer(playerLayer)
-        
-        // 添加手势识别器支持全屏
-        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleTap(_:)))
-        containerView.addGestureRecognizer(tapGesture)
-    }
-    
-    private func setupObservers() {
-        // 监听播放器图层的绑定状态
-        playerObservation = playerLayer.observe(\.isReadyForDisplay) { [weak self] layer, _ in
-            if layer.isReadyForDisplay {
-                self?.handlePlayerReady()
-            }
-        }
-        
-        // 监听设备方向变化
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(orientationChanged),
-            name: UIDevice.orientationDidChangeNotification,
-            object: nil
-        )
-    }
-    
-    private func handlePlayerReady() {
-        // 可以在这里添加视频准备就绪后的处理逻辑
-        updateVideoLayout()
-    }
-    
-    @objc private func handleTap(_ gesture: UITapGestureRecognizer) {
-        // 处理点击事件，可以在这里实现全屏切换等功能
-    }
-    
-    @objc private func orientationChanged() {
-        updateVideoLayout()
-    }
-    
-    private func updateVideoLayout() {
-        CATransaction.begin()
-        CATransaction.setAnimationDuration(0.25)
-        playerLayer.frame = containerView.bounds
-        CATransaction.commit()
     }
     
     func view() -> UIView {
         return containerView
     }
-    
-    func updateFrame(_ frame: CGRect) {
-        containerView.frame = frame
-        updateVideoLayout()
-    }
-    
-    deinit {
-        playerObservation?.invalidate()
-        NotificationCenter.default.removeObserver(self)
-    }
 }
-
-// import Flutter
-// import UIKit
-// import AVFoundation
-
-// public class VideoPlayerFactory: NSObject, FlutterPlatformViewFactory {
-//     private var messenger: FlutterBinaryMessenger
-
-//     public init(messenger: FlutterBinaryMessenger) {
-//         self.messenger = messenger
-//         super.init()
-//     }
-
-//     public func create(
-//         withFrame frame: CGRect,
-//         viewIdentifier viewId: Int64,
-//         arguments args: Any?
-//     ) -> FlutterPlatformView {
-//         return VideoPlayerView(
-//             frame: frame,
-//             viewIdentifier: viewId,
-//             arguments: args,
-//             binaryMessenger: messenger)
-//     }
-// }
-
-// class VideoPlayerView: NSObject, FlutterPlatformView {
-//     private let playerLayer: AVPlayerLayer
-//     private let containerView: UIView
-    
-//     init(frame: CGRect, viewIdentifier: Int64, player: AVPlayer) {
-//         containerView = UIView(frame: frame)
-//         playerLayer = AVPlayerLayer(player: player)
-//         super.init()
-        
-//         // 设置播放器图层
-//         playerLayer.frame = containerView.bounds
-//         playerLayer.videoGravity = .resizeAspect  // 可以根据需求调整视频缩放模式
-//         containerView.layer.addSublayer(playerLayer)
-        
-//         // 确保视图大小变化时更新播放器图层
-//         containerView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-//     }
-    
-//     func view() -> UIView {
-//         return containerView
-//     }
-    
-//     // 更新视频图层大小
-//     func updateFrame(_ frame: CGRect) {
-//         containerView.frame = frame
-//         playerLayer.frame = containerView.bounds
-//     }
-// }

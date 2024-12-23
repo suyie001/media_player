@@ -141,4 +141,12 @@ class MediaPlayer {
   Future<PlayMode> getPlayMode() {
     return MediaPlayerPlatform.instance.getPlayMode();
   }
+
+  Future<void> showVideoView() {
+    return MediaPlayerPlatform.instance.showVideoView();
+  }
+
+  Future<void> hideVideoView() {
+    return MediaPlayerPlatform.instance.hideVideoView();
+  }
 }

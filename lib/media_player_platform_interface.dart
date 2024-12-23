@@ -189,4 +189,14 @@ abstract class MediaPlayerPlatform extends PlatformInterface {
   Future<PlayMode> getPlayMode() {
     throw UnimplementedError('getPlayMode() has not been implemented.');
   }
+
+  /// 显示视频画面
+  Future<void> showVideoView() {
+    throw UnimplementedError('showVideoView() has not been implemented.');
+  }
+
+  /// 隐藏视频画面
+  Future<void> hideVideoView() {
+    throw UnimplementedError('hideVideoView() has not been implemented.');
+  }
 }
