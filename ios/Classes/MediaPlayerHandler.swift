@@ -259,6 +259,11 @@ class MediaPlayerHandler: NSObject, FlutterStreamHandler {
     }
     
     @objc private func handlePlaybackStateChanged() {
+        // 检查当前媒体项是否为视频
+        let isVideo = isCurrentItemVideo()
+        // 检查是否处于画中画模式
+        let isInPiPMode = pipController?.isPictureInPictureActive ?? false
+    
         // 发送完成事件
         eventSink?(["type": "completed", "data": true])
         
@@ -310,6 +315,16 @@ class MediaPlayerHandler: NSObject, FlutterStreamHandler {
                 }
             }
         }
+    }
+
+    // 添加辅助方法来检查当前媒体项是否为视频
+    private func isCurrentItemVideo() -> Bool {
+        guard let currentItem = player.currentItem,
+            let tracks = currentItem.asset.tracks(withMediaType: .video),
+            !tracks.isEmpty else {
+            return false
+        }
+        return true
     }
     
     private func updateNowPlayingInfo() {
@@ -510,7 +525,7 @@ class MediaPlayerHandler: NSObject, FlutterStreamHandler {
         
         switch playMode {
         case .all:
-            // 列表循环模式：始终启用所有按钮，因为可以循环播放
+            // 全部循环模式：始终启用所有按钮，因为可以循环播放
             commandCenter.nextTrackCommand.isEnabled = true
             commandCenter.previousTrackCommand.isEnabled = true
             
@@ -545,7 +560,7 @@ class MediaPlayerHandler: NSObject, FlutterStreamHandler {
         case .all, .list, .one:
             guard currentIndex < playerItems.count - 1 else {
                 if playMode == .all {
-                    // 列表循环模式下，从头开始
+                    // 全部循环模式下，从头开始
                     currentIndex = 0
                     // 直接跳出,避免执行 currentIndex += 1
                     break
