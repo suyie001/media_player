@@ -263,7 +263,10 @@ class MediaPlayerHandler: NSObject, FlutterStreamHandler {
         let isVideo = isCurrentItemVideo()
         // 检查是否处于画中画模式
         let isInPiPMode = pipController?.isPictureInPictureActive ?? false
-    
+        // 如果在画中画模式下，退出画中画
+        if isInPiPMode {
+            pipController?.stopPictureInPicture()
+        }
         // 发送完成事件
         eventSink?(["type": "completed", "data": true])
         
