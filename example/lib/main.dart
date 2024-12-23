@@ -31,7 +31,7 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
+class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   int _videoPlayerId = 0;
   bool _isVideoViewVisible = false;
   final _player = MediaPlayer();
@@ -45,7 +45,24 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
+    // 监听应用生命周期
+    WidgetsBinding.instance.addObserver(this);
+
     _initializePlayer();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+    } else if (state == AppLifecycleState.paused) {
+      print('应用进入后台');
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   Future<void> _initializePlayer() async {
@@ -69,15 +86,6 @@ class _MyHomePageState extends State<MyHomePage> {
         artist: 'Artist 1',
         album: 'Album 1',
         duration: const Duration(minutes: 3, seconds: 30),
-        artworkUrl: 'https://rabbit-u.oss-cn-hangzhou.aliyuncs.com/uploadfile/20240702/666699915832905728.jpg',
-      ),
-      MediaItem(
-        id: '3',
-        title: '视频项，暂时没有画面',
-        url: 'http://oss-api-audio.zuidie.net/audio/MP4L/7f12cb0dc07148898ef5b949e84b2eb6.mp4',
-        artist: 'Artist 2',
-        album: 'Album 2',
-        duration: const Duration(minutes: 4, seconds: 15),
         artworkUrl: 'https://rabbit-u.oss-cn-hangzhou.aliyuncs.com/uploadfile/20240702/666699915832905728.jpg',
       ),
       MediaItem(
@@ -165,16 +173,12 @@ class _MyHomePageState extends State<MyHomePage> {
     await _player.setPlaylist(playlist);
   }
 
-  addMedia() {
-    _player.add(MediaItem(
-      id: '6',
-      title: '无损',
-      url: 'http://oss-api-audio.zuidie.net/audio/FLAC/94703ba232f343a6b4a0c970c6eaa6d1.flac',
-      artist: 'Artist 2',
-      album: '没出息',
-      duration: const Duration(minutes: 4, seconds: 15),
-      artworkUrl: 'https://rabbit-u.oss-cn-hangzhou.aliyuncs.com/uploadfile/20240702/666699915832905728.jpg',
-    ));
+  Future<void> checkoutToAudio() async {
+    await _player.updateCurrentUrl('http://oss-api-audio.zuidie.net/audio/MP3L/94703ba232f343a6b4a0c970c6eaa6d1.mp3');
+  }
+
+  Future<void> checkoutToVideo() async {
+    await _player.updateCurrentUrl('http://oss-api-audio.zuidie.net/audio/MP4L/7f12cb0dc07148898ef5b949e84b2eb6.mp4');
   }
 
   moveMedia(int from, int to) {
@@ -305,12 +309,13 @@ class _MyHomePageState extends State<MyHomePage> {
                 IconButton(
                     onPressed: () async {
                       if (_isVideoViewVisible == false) {
+                        await checkoutToVideo();
                         await _player.showVideoView();
                         setState(() {
                           _isVideoViewVisible = true;
                         });
                       } else {
-                        // await _player.hideVideoView();
+                        await checkoutToAudio();
                         setState(() {
                           _isVideoViewVisible = false;
                         });
@@ -351,36 +356,31 @@ class _MyHomePageState extends State<MyHomePage> {
                       await _player.jumpTo(index);
                       await _player.play();
                     },
-                    onLongPress: () {
-                      showDialog(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: const Text('删除'),
-                          content: Text('是否删除 ${item.title}?'),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text('取消'),
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                Navigator.pop(context);
-                                removeMedia(index);
-                              },
-                              child: const Text('删除'),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
+                    // onLongPress: () {
+                    //   showDialog(
+                    //     context: context,
+                    //     builder: (context) => AlertDialog(
+                    //       title: const Text('删除'),
+                    //       content: Text('是否删除 ${item.title}?'),
+                    //       actions: [
+                    //         TextButton(
+                    //           onPressed: () => Navigator.pop(context),
+                    //           child: const Text('取消'),
+                    //         ),
+                    //         TextButton(
+                    //           onPressed: () {
+                    //             Navigator.pop(context);
+                    //             removeMedia(index);
+                    //           },
+                    //           child: const Text('删除'),
+                    //         ),
+                    //       ],
+                    //     ),
+                    //   );
+                    // },
                   );
                 },
               ),
-            ),
-            Row(
-              children: [
-                ElevatedButton(onPressed: addMedia, child: const Text('添加媒体')),
-              ],
             ),
           ],
         ),

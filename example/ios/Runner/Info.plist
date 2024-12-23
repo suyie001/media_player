@@ -16,6 +16,9 @@
 	<string>6.0</string>
 	<key>CFBundleName</key>
 	<string>media_player_example</string>
+	  <!-- 加密合规声明 -->
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

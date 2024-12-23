@@ -710,6 +710,20 @@ class MediaPlayerHandler: NSObject {
         player.removeObserver(self, forKeyPath: "currentItem.loadedTimeRanges")
         NotificationCenter.default.removeObserver(self)
     }
+    
+    func updateCurrentUrl(_ urlString: String) {
+        guard let url = URL(string: urlString) else {
+            eventSink?(["type": "error", "data": "Invalid URL"])
+            return
+        }
+        
+        let asset = AVAsset(url: url)
+        let playerItem = AVPlayerItem(asset: asset)
+        player.replaceCurrentItem(with: playerItem)
+        
+        // 通知 Flutter 端 URL 已更新
+        eventSink?(["type": "urlUpdated"])
+    }
 }
 
 extension Array {

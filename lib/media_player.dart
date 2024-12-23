@@ -142,11 +142,16 @@ class MediaPlayer {
     return MediaPlayerPlatform.instance.getPlayMode();
   }
 
-  Future<void> showVideoView() {
+  Future<void> showVideoView() async {
+    await MediaPlayerPlatform.instance.play();
     return MediaPlayerPlatform.instance.showVideoView();
   }
 
   Future<void> hideVideoView() {
     return MediaPlayerPlatform.instance.hideVideoView();
+  }
+
+  Future<void> updateCurrentUrl(String url) async {
+    return MediaPlayerPlatform.instance.updateCurrentUrl(url);
   }
 }

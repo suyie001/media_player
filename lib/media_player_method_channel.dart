@@ -147,4 +147,11 @@ class MethodChannelMediaPlayer extends MediaPlayerPlatform {
   Future<void> hideVideoView() async {
     await methodChannel.invokeMethod('hideVideoView');
   }
+
+  @override
+  Future<void> updateCurrentUrl(String url) async {
+    await methodChannel.invokeMethod('updateCurrentUrl', {
+      'url': url,
+    });
+  }
 }

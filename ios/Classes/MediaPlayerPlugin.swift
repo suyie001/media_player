@@ -28,10 +28,7 @@ public class MediaPlayerPlugin: NSObject, FlutterPlugin {
             }
             result(nil)
             
-        case "hideVideoView":
-            // 移除视频视图工厂
-            videoViewFactory = nil
-            result(nil)
+  
             
         case "initialize":
             result(nil)
@@ -160,7 +157,16 @@ public class MediaPlayerPlugin: NSObject, FlutterPlugin {
             mediaPlayer.setVolume(Float(volume))
             result(nil)
             
-    
+        case "updateCurrentUrl":
+            guard let args = call.arguments as? [String: Any],
+                  let url = args["url"] as? String else {
+                result(FlutterError(code: "INVALID_ARGUMENT",
+                                  message: "URL is required",
+                                  details: nil))
+                return
+            }
+            mediaPlayer.updateCurrentUrl(url)
+            result(nil)
             
         default:
             result(FlutterMethodNotImplemented)

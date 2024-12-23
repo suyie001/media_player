@@ -199,4 +199,9 @@ abstract class MediaPlayerPlatform extends PlatformInterface {
   Future<void> hideVideoView() {
     throw UnimplementedError('hideVideoView() has not been implemented.');
   }
+
+  /// 更新当前播放URL
+  Future<void> updateCurrentUrl(String url) {
+    throw UnimplementedError('updateCurrentUrl() has not been implemented.');
+  }
 }
