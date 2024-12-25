@@ -1,94 +1,55 @@
+plugins {
+    id 'com.android.library'
+    id 'kotlin-android'
+}
+
+def kotlin_version = '1.9.0'
 group = "com.example.media_player"
 version = "1.0-SNAPSHOT"
 
-buildscript {
-    ext.kotlin_version = "1.9.0"
-    repositories {
-        google()
-        mavenCentral()
-    }
-
-    dependencies {
-        classpath("com.android.tools.build:gradle:8.1.0")
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version")
-    }
-}
-
-allprojects {
-    repositories {
-        google()
-        mavenCentral()
-    }
-}
-
-rootProject.buildDir = '../build'
-subprojects {
-    project.buildDir = "${rootProject.buildDir}/${project.name}"
-}
-subprojects {
-    project.evaluationDependsOn(':app')
-}
-
-tasks.register("clean", Delete) {
-    delete rootProject.buildDir
-}
-
-apply plugin: "com.android.library"
-apply plugin: "kotlin-android"
-
 android {
-    if (project.android.hasProperty("namespace")) {
-        namespace = "com.example.media_player"
-    }
+    namespace "com.example.media_player"
+    compileSdk 34
 
-    compileSdk = 34
+    defaultConfig {
+        minSdk 21
+        targetSdk 34
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_1_8
+        jvmTarget = '1.8'
     }
 
     sourceSets {
-        main.java.srcDirs += "src/main/kotlin"
-        test.java.srcDirs += "src/test/kotlin"
-    }
-
-    defaultConfig {
-        minSdk = 21
-        targetSdkVersion = 34
-    }
-
-    dependencies {
-        testImplementation("org.jetbrains.kotlin:kotlin-test")
-        testImplementation("org.mockito:mockito-core:5.0.0")
-        implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
-        implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
-        
-        // Media3 dependencies
-        def media3_version = "1.2.0"
-        implementation "androidx.media3:media3-exoplayer:$media3_version"
-        implementation "androidx.media3:media3-session:$media3_version"
-        implementation "androidx.media3:media3-common:$media3_version"
-        implementation "androidx.media3:media3-ui:$media3_version"
-        
-        // AndroidX dependencies
-        implementation 'androidx.core:core-ktx:1.12.0'
-        implementation 'androidx.appcompat:appcompat:1.6.1'
-    }
-
-    testOptions {
-        unitTests.all {
-            useJUnitPlatform()
-
-            testLogging {
-               events "passed", "skipped", "failed", "standardOut", "standardError"
-               outputs.upToDateWhen {false}
-               showStandardStreams = true
-            }
-        }
+        main.java.srcDirs += 'src/main/kotlin'
+        test.java.srcDirs += 'src/test/kotlin'
     }
 }
+
+dependencies {
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+    
+    // Media3 dependencies
+    def media3_version = "1.2.0"
+    implementation "androidx.media3:media3-exoplayer:$media3_version"
+    implementation "androidx.media3:media3-session:$media3_version"
+    implementation "androidx.media3:media3-common:$media3_version"
+    implementation "androidx.media3:media3-ui:$media3_version"
+    
+    // AndroidX dependencies
+    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.media:media:1.6.0'
+    
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.mockito:mockito-core:5.0.0'
+}
+
+android.buildFeatures.buildConfig = true
