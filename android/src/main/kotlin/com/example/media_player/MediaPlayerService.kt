@@ -86,6 +86,7 @@ class MediaPlayerService : MediaSessionService() {
         try {
             initializePlayer()
             initializeMediaSession()
+            startPositionUpdates()
             android.util.Log.d("MediaPlayerService", "Service initialization completed successfully")
         } catch (e: Exception) {
             android.util.Log.e("MediaPlayerService", "Error during service initialization", e)
@@ -112,10 +113,15 @@ class MediaPlayerService : MediaSessionService() {
                         .build(),
                     true
                 )
+                .setHandleAudioBecomingNoisy(true)  // 处理耳机拔出等情况
+                .setWakeMode(C.WAKE_MODE_NETWORK)   // 保持网络唤醒
                 .build().apply {
                     // 设置默认的播放模式
                     repeatMode = Player.REPEAT_MODE_OFF
                     shuffleModeEnabled = false
+                    
+                    // 设置视频输出
+                    setVideoScalingMode(C.VIDEO_SCALING_MODE_SCALE_TO_FIT)  // 设置视频缩放模式
                     
                     // 添加播放器监听
                     addListener(playerListener)
@@ -131,6 +137,7 @@ class MediaPlayerService : MediaSessionService() {
         android.util.Log.d("MediaPlayerService", "Initializing MediaSession")
         mediaSession = MediaSession.Builder(this, player)
             .setCallback(mediaSessionCallback)
+            .setId("MediaPlayerService")  // 设置唯一标识符
             .build()
         android.util.Log.d("MediaPlayerService", "MediaSession initialized successfully")
     }
@@ -200,6 +207,21 @@ class MediaPlayerService : MediaSessionService() {
                 notifyBufferProgress()
             }
         }
+
+        override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
+            // 通知视频尺寸变化
+            val event = mapOf(
+                "type" to "videoSizeChanged",
+                "data" to mapOf(
+                    "width" to videoSize.width,
+                    "height" to videoSize.height,
+                    "unappliedRotationDegrees" to videoSize.unappliedRotationDegrees,
+                    "pixelWidthHeightRatio" to videoSize.pixelWidthHeightRatio
+                )
+            )
+            android.util.Log.d("MediaPlayerService", "Video size changed: ${videoSize.width}x${videoSize.height}")
+            broadcastEvent(event)
+        }
     }
 
     private val mediaSessionCallback = object : MediaSession.Callback {
@@ -241,7 +263,7 @@ class MediaPlayerService : MediaSessionService() {
                 player.shuffleModeEnabled = true
             }
         }
-        // 发送播放模式变化事件
+        // 发送播��模式变化事件
         notifyPlayModeChanged(mode)
     }
     
@@ -310,7 +332,7 @@ class MediaPlayerService : MediaSessionService() {
                 player.play()
             }
             PlayMode.ALL -> {
-                // 列表循环：如果是最后一首，则从头开始
+                // 列表循环：如果是最一首，则从头开始
                 if (!player.hasNextMediaItem()) {
                     player.seekToDefaultPosition(0)
                     player.play()
