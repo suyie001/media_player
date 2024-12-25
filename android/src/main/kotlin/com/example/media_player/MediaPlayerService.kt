@@ -12,8 +12,10 @@ import androidx.core.app.NotificationCompat
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.common.Player.RepeatMode
+import androidx.media3.common.Timeline
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
@@ -202,11 +204,11 @@ class MediaPlayerService : MediaSessionService() {
             }
         }
 
-        override fun onPlaylistMetadataChanged(mediaMetadata: MediaMetadata) {
+        override fun onPlaylistMetadataChanged(metadata: MediaMetadata) {
             notifyPlaylistChanged()
         }
 
-        override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
+        override fun onTimelineChanged(timeline: Timeline, reason: Int) {
             notifyPlaylistChanged()
         }
 
