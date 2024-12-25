@@ -201,7 +201,15 @@ class MediaPlayerService : MediaSessionService() {
                 notifyMediaItemChanged(it) 
             }
         }
-        
+
+        override fun onPlaylistMetadataChanged(mediaMetadata: MediaMetadata) {
+            notifyPlaylistChanged()
+        }
+
+        override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
+            notifyPlaylistChanged()
+        }
+
         override fun onPositionDiscontinuity(
             oldPosition: Player.PositionInfo,
             newPosition: Player.PositionInfo,
@@ -485,5 +493,30 @@ class MediaPlayerService : MediaSessionService() {
     private fun broadcastEvent(event: Map<String, Any?>) {
         android.util.Log.d("MediaPlayerService", "Broadcasting event: ${event["type"]}")
         eventListener?.onEvent(event)
+    }
+
+    private fun notifyPlaylistChanged() {
+        val mediaItems = mutableListOf<MediaItem>()
+        for (i in 0 until player.mediaItemCount) {
+            player.getMediaItemAt(i)?.let { mediaItems.add(it) }
+        }
+        
+        val playlistData = mediaItems.map { mediaItem ->
+            mapOf(
+                "id" to mediaItem.mediaId,
+                "title" to mediaItem.mediaMetadata.title,
+                "artist" to mediaItem.mediaMetadata.artist,
+                "album" to mediaItem.mediaMetadata.displayTitle,
+                "artworkUrl" to mediaItem.mediaMetadata.artworkUri?.toString(),
+                "url" to mediaItem.localConfiguration?.uri?.toString()
+            )
+        }
+        
+        val event = mapOf(
+            "type" to "playlistChanged",
+            "data" to playlistData
+        )
+        android.util.Log.d("MediaPlayerService", "Broadcasting playlist changed event with ${playlistData.size} items")
+        broadcastEvent(event)
     }
 } 
