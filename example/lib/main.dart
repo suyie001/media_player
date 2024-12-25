@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:media_player/media_player.dart';
+import 'package:permission_handler/permission_handler.dart';
 // import 'package:media_player/media_player_platform_interface.dart';
 
 void main() {
@@ -47,7 +48,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     super.initState();
     // 监听应用生命周期
     WidgetsBinding.instance.addObserver(this);
-
+    _requestNotificationPermission();
     _initializePlayer();
   }
 
@@ -407,5 +408,74 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     final minutes = twoDigits(duration.inMinutes.remainder(60));
     final seconds = twoDigits(duration.inSeconds.remainder(60));
     return '$minutes:$seconds';
+  }
+
+  Future<void> _requestNotificationPermission() async {
+    // 检查当前权限状态
+    final status = await Permission.notification.status;
+
+    if (status.isDenied) {
+      // 如果权限被拒绝，请求权限
+      final result = await Permission.notification.request();
+
+      if (result.isPermanentlyDenied) {
+        // 如果用户永久拒绝了权限，提示用户去设置中心开启
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('需要通知权限'),
+              content: const Text('请在设置中开启通知权限，以便接收媒体播放控制和通知'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('取消'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    openAppSettings();
+                  },
+                  child: const Text('去设置'),
+                ),
+              ],
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  // 可选：添加一个检查权限的方法
+  Future<bool> _checkNotificationPermission() async {
+    final status = await Permission.notification.status;
+    return status.isGranted;
+  }
+
+  // 可选：添加一个手动请求权限的方法
+  Future<void> _manualRequestPermission() async {
+    final status = await Permission.notification.request();
+    if (status.isPermanentlyDenied && mounted) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('需要通知权限'),
+          content: const Text('请在设置中开启通知权限'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                openAppSettings();
+              },
+              child: const Text('去设置'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 }

@@ -63,5 +63,7 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSUserNotificationUsageDescription</key>
+	<string>需要通知权限来显示媒体播放控制和通知</string>
 </dict>
 </plist>
