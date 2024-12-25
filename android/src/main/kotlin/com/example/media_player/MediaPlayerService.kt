@@ -1,25 +1,16 @@
 package com.example.media_player
 
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.content.Intent
-import android.graphics.Bitmap
 import android.os.Build
-import android.os.Bundle
-import androidx.core.app.NotificationCompat
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
-import androidx.media3.common.Player.RepeatMode
 import androidx.media3.common.Timeline
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
-import androidx.media3.session.MediaStyleNotificationHelper
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -32,10 +23,6 @@ class MediaPlayerService : MediaSessionService() {
     
     private lateinit var player: ExoPlayer
     private lateinit var mediaSession: MediaSession
-    private lateinit var notificationManager: NotificationManager
-    
-    private val channelId = "media_player_channel"
-    private val notificationId = 1
     
     // 播放模式
     enum class PlayMode {
@@ -99,8 +86,6 @@ class MediaPlayerService : MediaSessionService() {
         try {
             initializePlayer()
             initializeMediaSession()
-            initializeNotificationManager()
-            startPositionUpdates()
             android.util.Log.d("MediaPlayerService", "Service initialization completed successfully")
         } catch (e: Exception) {
             android.util.Log.e("MediaPlayerService", "Error during service initialization", e)
@@ -135,16 +120,6 @@ class MediaPlayerService : MediaSessionService() {
                     // 添加播放器监听
                     addListener(playerListener)
                     android.util.Log.d("MediaPlayerService", "Player initialized with listener")
-                    
-                    // 检查播放器状态
-                    val state = when (playbackState) {
-                        Player.STATE_IDLE -> "idle"
-                        Player.STATE_BUFFERING -> "buffering"
-                        Player.STATE_READY -> "ready"
-                        Player.STATE_ENDED -> "ended"
-                        else -> "unknown"
-                    }
-                    android.util.Log.d("MediaPlayerService", "Initial player state: $state")
                 }
         } catch (e: Exception) {
             android.util.Log.e("MediaPlayerService", "Error initializing player", e)
@@ -160,24 +135,8 @@ class MediaPlayerService : MediaSessionService() {
         android.util.Log.d("MediaPlayerService", "MediaSession initialized successfully")
     }
 
-    private fun initializeNotificationManager() {
-        notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                channelId,
-                "Media Player",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Media player controls"
-            }
-            notificationManager.createNotificationChannel(channel)
-        }
-    }
-
     private val playerListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
-            updateNotification()
             // 通知播放状态变化
             val state = when (playbackState) {
                 Player.STATE_IDLE -> "none"
@@ -196,7 +155,6 @@ class MediaPlayerService : MediaSessionService() {
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-            updateNotification()
             // 通知媒体项变化
             mediaItem?.let { 
                 android.util.Log.d("MediaPlayerService", "Media item changed: ${it.mediaId}")
@@ -204,11 +162,10 @@ class MediaPlayerService : MediaSessionService() {
             }
         }
 
-        override fun onPlaylistMetadataChanged(metadata: MediaMetadata) {
-            notifyPlaylistChanged()
-        }
-
         override fun onTimelineChanged(timeline: Timeline, reason: Int) {
+            if (reason != Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED) {
+                return
+            }
             notifyPlaylistChanged()
         }
 
@@ -221,14 +178,7 @@ class MediaPlayerService : MediaSessionService() {
             notifyPositionChanged(newPosition.positionMs)
         }
         
-        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
-            // 通知播放/暂停状态变化
-            val state = if (playWhenReady) "playing" else "paused"
-            notifyPlaybackStateChanged(state)
-        }
-        
         override fun onIsPlayingChanged(isPlaying: Boolean) {
-            updateNotification()
             // 通知播放状态变化
             val state = if (isPlaying) "playing" else "paused"
             notifyPlaybackStateChanged(state)
@@ -244,16 +194,11 @@ class MediaPlayerService : MediaSessionService() {
         override fun onIsLoadingChanged(isLoading: Boolean) {
             // 通知缓冲状态
             notifyBufferingChanged(isLoading)
-        }
-        
-        override fun onLoadingChanged(isLoading: Boolean) {
-            // 通知缓冲状态（兼容旧版本）
-            notifyBufferingChanged(isLoading)
-        }
-        
-        override fun onAvailableCommandsChanged(availableCommands: Player.Commands) {
-            // 更新可用的控制命令
-            updatePlayerControls(availableCommands)
+            
+            // 如果不在缓冲状态，发送缓冲进度
+            if (!isLoading) {
+                notifyBufferProgress()
+            }
         }
     }
 
@@ -272,31 +217,6 @@ class MediaPlayerService : MediaSessionService() {
         ): MediaSession.ConnectionResult {
             return super.onConnect(session, controller)
         }
-    }
-
-    private fun updateNotification() {
-        val notification = buildNotification()
-        notificationManager.notify(notificationId, notification)
-    }
-
-    private fun buildNotification(): Notification {
-        val mediaItem = player.currentMediaItem
-        val title = mediaItem?.mediaMetadata?.title ?: "Unknown"
-        val artist = mediaItem?.mediaMetadata?.artist ?: "Unknown"
-        
-        val builder = NotificationCompat.Builder(this, channelId)
-            .setSmallIcon(android.R.drawable.ic_media_play)
-            .setContentTitle(title)
-            .setContentText(artist)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setOnlyAlertOnce(true)
-            .setOngoing(player.isPlaying)
-
-        // 添加媒体样式
-        val mediaStyle = MediaStyleNotificationHelper.MediaStyle(mediaSession)
-        builder.setStyle(mediaStyle)
-
-        return builder.build()
     }
 
     // 播放模式控制
@@ -385,7 +305,7 @@ class MediaPlayerService : MediaSessionService() {
     private fun handlePlaybackCompletion() {
         when (currentPlayMode) {
             PlayMode.ONE -> {
-                // 单曲循环：新播放当前曲
+                // 单曲循环：重新播放当前曲
                 player.seekTo(0)
                 player.play()
             }
@@ -411,12 +331,6 @@ class MediaPlayerService : MediaSessionService() {
                 player.play()
             }
         }
-    }
-    
-    private fun updatePlayerControls(commands: Player.Commands) {
-        // 更新通知栏控制按钮状态
-        val notification = buildNotification()
-        notificationManager.notify(notificationId, notification)
     }
     
     // 通知方法
