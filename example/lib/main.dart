@@ -238,9 +238,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                   aspectRatio: 16 / 9, // 或其他适合的宽高比
                   child: VideoPlayerView(
                     onPlatformViewCreated: (id) {
-                      print('videoPlayerId: $id');
-                      _videoPlayerId = id;
-                      setState(() {});
+                      print('Video view created: $id');
+                    },
+                    onDispose: () {
+                      print('Video view disposed');
                     },
                   ),
                 ),

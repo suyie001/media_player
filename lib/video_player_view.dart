@@ -5,26 +5,54 @@ import 'package:flutter/services.dart';
 import 'media_player_method_channel.dart';
 
 class VideoPlayerView extends StatelessWidget {
-  const VideoPlayerView({super.key, required this.onPlatformViewCreated});
-  // 回调
+  const VideoPlayerView({
+    super.key,
+    required this.onPlatformViewCreated,
+    required this.onDispose,
+  });
+
   final Function(int) onPlatformViewCreated;
+  final VoidCallback onDispose;
+
   @override
   Widget build(BuildContext context) {
-    // 根据平台返回不同的实现
     if (defaultTargetPlatform == TargetPlatform.iOS) {
-      return UiKitView(
-        viewType: 'media_player_video_view',
-        creationParamsCodec: const StandardMessageCodec(),
-        onPlatformViewCreated: (int id) {
-          // 视图创建完成的回调
-          // MethodChannelMediaPlayer().videoPlayerId(id);
-          //todo id 通过回调传出去
-          onPlatformViewCreated(id);
-        },
+      return _IOSVideoPlayer(
+        onPlatformViewCreated: onPlatformViewCreated,
+        onDispose: onDispose,
       );
     }
-
-    // Android 平台或其他平台的实现
     return Container();
+  }
+}
+
+// 创建一个有状态的 widget 来处理生命周期
+class _IOSVideoPlayer extends StatefulWidget {
+  const _IOSVideoPlayer({
+    required this.onPlatformViewCreated,
+    required this.onDispose,
+  });
+
+  final Function(int) onPlatformViewCreated;
+  final VoidCallback onDispose;
+
+  @override
+  State<_IOSVideoPlayer> createState() => _IOSVideoPlayerState();
+}
+
+class _IOSVideoPlayerState extends State<_IOSVideoPlayer> {
+  @override
+  void dispose() {
+    widget.onDispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return UiKitView(
+      viewType: 'media_player_video_view',
+      creationParamsCodec: const StandardMessageCodec(),
+      onPlatformViewCreated: widget.onPlatformViewCreated,
+    );
   }
 }

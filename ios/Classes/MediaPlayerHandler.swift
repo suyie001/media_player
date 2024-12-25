@@ -323,11 +323,17 @@ class MediaPlayerHandler: NSObject, FlutterStreamHandler {
     // 添加辅助方法来检查当前媒体项是否为视频
     private func isCurrentItemVideo() -> Bool {
         guard let currentItem = player.currentItem,
-            let tracks = currentItem.asset.tracks(withMediaType: .video),
-            !tracks.isEmpty else {
+              let asset = currentItem.asset as? AVURLAsset else {
             return false
         }
-        return true
+        
+        // 使用可选绑定来处理 tracks
+        if let videoTracks = try? asset.tracks(withMediaType: .video),
+           !videoTracks.isEmpty {
+            return true
+        }
+        
+        return false
     }
     
     private func updateNowPlayingInfo() {
@@ -667,7 +673,7 @@ class MediaPlayerHandler: NSObject, FlutterStreamHandler {
                 currentIndex = min(index, playlist.count - 1)
                 player.replaceCurrentItem(with: playerItems[currentIndex])
                 updateNowPlayingInfo()
-                // 发送当��媒体项变化事件
+                // 发送当前媒体项变化事件
                 if let currentItem = playlist[safe: currentIndex] {
                     eventSink?(["type": "mediaItemChanged", "data": createMediaItemMap(from: currentItem)])
                 }
@@ -758,7 +764,7 @@ class MediaPlayerHandler: NSObject, FlutterStreamHandler {
             // 发送播放模式变化事件
             eventSink?(["type": "playModeChanged", "data": mode])
             
-            // 更新远程控制按钮状态
+            // 更新远程控制按��状态
             updateRemoteCommandsState()
         }
     }
@@ -798,28 +804,20 @@ class MediaPlayerHandler: NSObject, FlutterStreamHandler {
         if let currentItem = playlist[safe: currentIndex] {
             eventSink?(["type": "mediaItemChanged", "data": createMediaItemMap(from: currentItem)])
         }
-        // 通知flutter端，当前媒体项时长变化
+        // 通知flutter���，当前媒体项时长变化
         if let duration = playerItem.asset.duration.seconds.isNaN ? nil : playerItem.asset.duration.seconds {
             eventSink?(["type": "durationChanged", "data": Int(duration * 1000)])
         }
     }
     
     private func setupPictureInPicture() {
-        // 检查设备是否支持画中画
         guard AVPictureInPictureController.isPictureInPictureSupported(),
               let playerLayer = self.playerLayer else {
-            print("设备不支持画中画或 playerLayer 未初始化")
             return
         }
         
-        // 创建画中画控制器
         pipController = AVPictureInPictureController(playerLayer: playerLayer)
         pipController?.delegate = self
-        
-        // 设置自动启动画中画
-        if #available(iOS 14.2, *) {
-            pipController?.canStartPictureInPictureAutomaticallyFromInline = true
-        }
     }
     
     // 提供开始/停止画中画的方法
@@ -834,6 +832,32 @@ class MediaPlayerHandler: NSObject, FlutterStreamHandler {
     // 获取 playerLayer 的访问器方法
     func getPlayerLayer() -> AVPlayerLayer? {
         return playerLayer
+    }
+    
+    // 添加视图管理方法
+    func attachPlayerLayer() -> AVPlayerLayer {
+        if playerLayer == nil {
+            playerLayer = AVPlayerLayer(player: player)
+            playerLayer?.videoGravity = .resizeAspect
+            
+            // 重新设置画中画控制器
+            setupPictureInPicture()
+        }
+        return playerLayer!
+    }
+    
+    func detachPlayerLayer() {
+        // 如果正在画中画模式，先停止
+        if pipController?.isPictureInPictureActive == true {
+            pipController?.stopPictureInPicture()
+        }
+        
+        // 清理画中画控制器
+        pipController = nil
+        
+        // 移除播放器图层
+        playerLayer?.removeFromSuperlayer()
+        playerLayer = nil
     }
 }
 
