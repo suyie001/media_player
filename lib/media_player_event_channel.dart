@@ -41,6 +41,7 @@ class MediaPlayerEventChannel {
   /// 获取事件流
   Stream<MediaPlayerEvent> get eventStream {
     _eventStream ??= _eventChannel.receiveBroadcastStream().map((event) {
+      print('event: $event');
       if (event is! Map) return MediaPlayerEvent(MediaPlayerEventType.unknown, null);
       return MediaPlayerEvent.fromMap(Map<String, dynamic>.from(event));
     });

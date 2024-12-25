@@ -45,40 +45,117 @@ class MediaPlayerService : MediaSessionService() {
     
     private var currentPlayMode = PlayMode.LIST
 
+    // 事件广播接口
+    interface EventListener {
+        fun onEvent(event: Map<String, Any?>)
+    }
+    
+    // 添加 Binder 类
+    inner class LocalBinder : android.os.Binder() {
+        val service: MediaPlayerService
+            get() = this@MediaPlayerService
+    }
+
+    private val binder = LocalBinder()
+
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
+        android.util.Log.d("MediaPlayerService", "onGetSession called for controller: ${controllerInfo.packageName}")
+        if (controllerInfo.packageName == packageName) {
+            return mediaSession
+        }
+        return null
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        super.onStartCommand(intent, flags, startId)
+        return START_STICKY
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        stopSelf()
+    }
+
+    companion object {
+        private var eventListener: EventListener? = null
+        private var instance: MediaPlayerService? = null
+        
+        fun setEventListener(listener: EventListener?) {
+            eventListener = listener
+        }
+
+        fun getInstance(): MediaPlayerService? {
+            return instance
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
+        instance = this
         android.util.Log.d("MediaPlayerService", "Service onCreate")
-        initializePlayer()
-        initializeMediaSession()
-        initializeNotificationManager()
-        android.util.Log.d("MediaPlayerService", "Service initialization completed")
+        
+        try {
+            initializePlayer()
+            initializeMediaSession()
+            initializeNotificationManager()
+            startPositionUpdates()
+            android.util.Log.d("MediaPlayerService", "Service initialization completed successfully")
+        } catch (e: Exception) {
+            android.util.Log.e("MediaPlayerService", "Error during service initialization", e)
+        }
+    }
+
+    override fun onDestroy() {
+        instance = null
+        positionUpdateJob?.cancel()
+        mediaSession.release()
+        player.release()
+        serviceJob.cancel()
+        super.onDestroy()
     }
 
     private fun initializePlayer() {
         android.util.Log.d("MediaPlayerService", "Initializing player")
-        player = ExoPlayer.Builder(this)
-            .setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(C.USAGE_MEDIA)
-                    .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
-                    .build(),
-                true
-            )
-            .build().apply {
-                // 设置默认的播放模式
-                repeatMode = Player.REPEAT_MODE_OFF
-                shuffleModeEnabled = false
-                
-                // 添加播放器监听
-                addListener(playerListener)
-                android.util.Log.d("MediaPlayerService", "Player initialized with listener")
-            }
+        try {
+            player = ExoPlayer.Builder(this)
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(C.USAGE_MEDIA)
+                        .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                        .build(),
+                    true
+                )
+                .build().apply {
+                    // 设置默认的播放模式
+                    repeatMode = Player.REPEAT_MODE_OFF
+                    shuffleModeEnabled = false
+                    
+                    // 添加播放器监听
+                    addListener(playerListener)
+                    android.util.Log.d("MediaPlayerService", "Player initialized with listener")
+                    
+                    // 检查播放器状态
+                    val state = when (playbackState) {
+                        Player.STATE_IDLE -> "idle"
+                        Player.STATE_BUFFERING -> "buffering"
+                        Player.STATE_READY -> "ready"
+                        Player.STATE_ENDED -> "ended"
+                        else -> "unknown"
+                    }
+                    android.util.Log.d("MediaPlayerService", "Initial player state: $state")
+                }
+        } catch (e: Exception) {
+            android.util.Log.e("MediaPlayerService", "Error initializing player", e)
+            throw e
+        }
     }
 
     private fun initializeMediaSession() {
+        android.util.Log.d("MediaPlayerService", "Initializing MediaSession")
         mediaSession = MediaSession.Builder(this, player)
             .setCallback(mediaSessionCallback)
             .build()
+        android.util.Log.d("MediaPlayerService", "MediaSession initialized successfully")
     }
 
     private fun initializeNotificationManager() {
@@ -212,12 +289,9 @@ class MediaPlayerService : MediaSessionService() {
         return builder.build()
     }
 
-    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
-        return mediaSession
-    }
-    
     // 播放模式控制
     fun setPlayMode(mode: PlayMode) {
+        android.util.Log.d("MediaPlayerService", "Setting play mode to: $mode")
         currentPlayMode = mode
         when (mode) {
             PlayMode.ALL -> {
@@ -237,19 +311,19 @@ class MediaPlayerService : MediaSessionService() {
                 player.shuffleModeEnabled = true
             }
         }
+        // 发送播放模式变化事件
+        notifyPlayModeChanged(mode)
     }
     
     fun getPlayMode(): PlayMode = currentPlayMode
     
     // 通知方法
     private fun notifyPlaybackStateChanged(state: String) {
-        mediaSession.player.currentMediaItem?.let { mediaItem ->
-            val event = mapOf(
-                "type" to "playbackStateChanged",
-                "data" to state
-            )
-            // 通过 EventChannel 发送事件
-        }
+        val event = mapOf(
+            "type" to "playbackStateChanged",
+            "data" to state
+        )
+        broadcastEvent(event)
     }
     
     private fun notifyMediaItemChanged(mediaItem: MediaItem) {
@@ -264,7 +338,7 @@ class MediaPlayerService : MediaSessionService() {
                 "url" to mediaItem.localConfiguration?.uri?.toString()
             )
         )
-        // 通过 EventChannel 发送事件
+        broadcastEvent(event)
     }
     
     private fun notifyPositionChanged(positionMs: Long) {
@@ -272,19 +346,11 @@ class MediaPlayerService : MediaSessionService() {
             "type" to "positionChanged",
             "data" to positionMs
         )
-        // 通过 EventChannel 发送事件
+        broadcastEvent(event)
     }
 
-    override fun onDestroy() {
-        mediaSession.release()
-        player.release()
-        serviceJob.cancel()
-        super.onDestroy()
-    }
-    
-    // 获取播放器实例
-    fun getPlayer(): ExoPlayer = player
-    
+    private var positionUpdateJob: kotlinx.coroutines.Job? = null
+
     private fun handlePlaybackError(error: androidx.media3.common.PlaybackException) {
         when (error.errorCode) {
             androidx.media3.common.PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
@@ -309,7 +375,7 @@ class MediaPlayerService : MediaSessionService() {
     private fun handlePlaybackCompletion() {
         when (currentPlayMode) {
             PlayMode.ONE -> {
-                // 单曲循环：重新播放当前歌曲
+                // 单曲循环：新播放当前曲
                 player.seekTo(0)
                 player.play()
             }
@@ -349,7 +415,7 @@ class MediaPlayerService : MediaSessionService() {
             "type" to "error",
             "data" to message
         )
-        // 通过 EventChannel 发送事件
+        broadcastEvent(event)
     }
     
     private fun notifyBufferingChanged(isBuffering: Boolean) {
@@ -357,7 +423,7 @@ class MediaPlayerService : MediaSessionService() {
             "type" to "bufferingChanged",
             "data" to isBuffering
         )
-        // 通过 EventChannel 发送事件
+        broadcastEvent(event)
     }
     
     private fun notifyBufferProgress() {
@@ -369,7 +435,55 @@ class MediaPlayerService : MediaSessionService() {
                 "type" to "bufferChanged",
                 "data" to progress
             )
-            // 通过 EventChannel 发送事件
+            broadcastEvent(event)
         }
+    }
+
+    private fun startPositionUpdates() {
+        positionUpdateJob?.cancel()
+        positionUpdateJob = serviceScope.launch {
+            while (true) {
+                if (player.isPlaying) {
+                    // 发送播放位置
+                    notifyPositionChanged(player.currentPosition)
+                    // 发送时长
+                    notifyDurationChanged(player.duration)
+                }
+                kotlinx.coroutines.delay(1000) // 每秒更新一次
+            }
+        }
+    }
+
+    private fun notifyDurationChanged(durationMs: Long) {
+        val event = mapOf(
+            "type" to "durationChanged",
+            "data" to durationMs
+        )
+        broadcastEvent(event)
+    }
+
+    private fun notifyPlayModeChanged(mode: PlayMode) {
+        val modeString = when (mode) {
+            PlayMode.ALL -> "all"
+            PlayMode.LIST -> "list"
+            PlayMode.ONE -> "one"
+            PlayMode.SHUFFLE -> "shuffle"
+        }
+        val event = mapOf(
+            "type" to "playModeChanged",
+            "data" to modeString
+        )
+        android.util.Log.d("MediaPlayerService", "Broadcasting play mode changed event: $modeString")
+        broadcastEvent(event)
+    }
+
+    // 自定义绑定方法
+    fun getCustomBinder(): android.os.IBinder {
+        return binder
+    }
+
+    private fun broadcastEvent(event: Map<String, Any?>) {
+        android.util.Log.d("MediaPlayerService", "Broadcasting event: ${event["type"]}")
+        eventListener?.onEvent(event)
     }
 } 

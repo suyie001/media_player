@@ -35,6 +35,15 @@ class MediaPlayerPlugin : FlutterPlugin, MethodCallHandler {
     private var controller: MediaController? = null
     private var videoViewFactory: VideoPlayerViewFactory? = null
 
+    private val serviceEventListener = object : MediaPlayerService.EventListener {
+        override fun onEvent(event: Map<String, Any?>) {
+            android.util.Log.d("MediaPlayerPlugin", "Received event: ${event["type"]}")
+            eventSink?.success(event)
+        }
+    }
+
+    private var mediaService: MediaPlayerService? = null
+
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         flutterPluginBinding = binding
         context = binding.applicationContext
@@ -46,103 +55,119 @@ class MediaPlayerPlugin : FlutterPlugin, MethodCallHandler {
         eventChannel.setStreamHandler(object : EventChannel.StreamHandler {
             override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
                 eventSink = events
+                android.util.Log.d("MediaPlayerPlugin", "Event sink registered")
             }
 
             override fun onCancel(arguments: Any?) {
                 eventSink = null
+                android.util.Log.d("MediaPlayerPlugin", "Event sink cancelled")
             }
         })
         
-        initializeController()
+        // 启动服务
+        val intent = Intent(context, MediaPlayerService::class.java)
+        context.startService(intent)
+        
+        // 设置事件监听器
+        MediaPlayerService.setEventListener(serviceEventListener)
+        
+        // 获取服务实例
+        mediaService = MediaPlayerService.getInstance()
+        
+        // 初始化 controller
+        if (mediaService != null) {
+            initializeController()
+        } else {
+            android.util.Log.e("MediaPlayerPlugin", "Failed to get service instance")
+            // 延迟重试
+            serviceScope.launch {
+                kotlinx.coroutines.delay(1000)
+                mediaService = MediaPlayerService.getInstance()
+                if (mediaService != null) {
+                    initializeController()
+                }
+            }
+        }
     }
 
     private fun initializeController() {
         android.util.Log.d("MediaPlayerPlugin", "Initializing controller")
-        val sessionToken = SessionToken(
-            context,
-            ComponentName(context, MediaPlayerService::class.java)
-        )
         
-        controllerFuture = MediaController.Builder(context, sessionToken).buildAsync()
-        controllerFuture?.addListener({
-            android.util.Log.d("MediaPlayerPlugin", "Controller future completed")
-            controller = controllerFuture?.get()
-            controller?.let {
-                android.util.Log.d("MediaPlayerPlugin", "Controller initialized successfully")
-                it.addListener(playerListener)
+        try {
+            // 如果已经有 future，先取消它
+            controllerFuture?.cancel(true)
+            
+            val componentName = ComponentName(context, MediaPlayerService::class.java)
+            android.util.Log.d("MediaPlayerPlugin", "Creating session token for component: ${componentName.flattenToString()}")
+            
+            val sessionToken = SessionToken(context, componentName)
+            
+            controllerFuture = MediaController.Builder(context, sessionToken)
+                .setApplicationLooper(android.os.Looper.getMainLooper())
+                .buildAsync()
                 
-                // 创建视频视图工厂
-                videoViewFactory = VideoPlayerViewFactory(context, it)
-                // 注册视频视图工厂
-                flutterPluginBinding.platformViewRegistry.registerViewFactory(
-                    "media_player_video_view",
-                    videoViewFactory!!
-                )
-                android.util.Log.d("MediaPlayerPlugin", "Video view factory registered")
-            } ?: android.util.Log.e("MediaPlayerPlugin", "Failed to get controller")
-        }, MoreExecutors.directExecutor())
+            controllerFuture?.addListener({
+                try {
+                    android.util.Log.d("MediaPlayerPlugin", "Controller future completed")
+                    controller = controllerFuture?.get()
+                    controller?.let {
+                        android.util.Log.d("MediaPlayerPlugin", "Controller initialized successfully")
+                        it.addListener(playerListener)
+                        
+                        // 创建视频视图工厂
+                        videoViewFactory = VideoPlayerViewFactory(context, it)
+                        // 注册视频视图工厂
+                        flutterPluginBinding.platformViewRegistry.registerViewFactory(
+                            "media_player_video_view",
+                            videoViewFactory!!
+                        )
+                        android.util.Log.d("MediaPlayerPlugin", "Video view factory registered")
+                        
+                        // 检查播放器状态
+                        val state = when (it.playbackState) {
+                            Player.STATE_IDLE -> "idle"
+                            Player.STATE_BUFFERING -> "buffering"
+                            Player.STATE_READY -> "ready"
+                            Player.STATE_ENDED -> "ended"
+                            else -> "unknown"
+                        }
+                        android.util.Log.d("MediaPlayerPlugin", "Initial player state: $state")
+                    } ?: run {
+                        android.util.Log.e("MediaPlayerPlugin", "Failed to get controller")
+                        // 重试初始化
+                        serviceScope.launch {
+                            kotlinx.coroutines.delay(1000)
+                            initializeController()
+                        }
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("MediaPlayerPlugin", "Error initializing controller", e)
+                    // 重试初始化
+                    serviceScope.launch {
+                        kotlinx.coroutines.delay(1000)
+                        initializeController()
+                    }
+                }
+            }, MoreExecutors.directExecutor())
+        } catch (e: Exception) {
+            android.util.Log.e("MediaPlayerPlugin", "Error creating controller", e)
+        }
     }
 
     private val playerListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
-            val state = when (playbackState) {
-                Player.STATE_IDLE -> "none"
-                Player.STATE_BUFFERING -> "loading"
-                Player.STATE_READY -> "ready"
-                Player.STATE_ENDED -> "completed"
-                else -> "unknown"
-            }
-            
-            eventSink?.success(mapOf(
-                "type" to "playbackStateChanged",
-                "data" to state
-            ))
+            // 仅用于内部状态更新，不发送事件
+            android.util.Log.d("MediaPlayerPlugin", "Plugin received playback state change: $playbackState")
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-            mediaItem?.let {
-                eventSink?.success(mapOf(
-                    "type" to "mediaItemChanged",
-                    "data" to mediaItemToMap(it)
-                ))
-            }
+            // 仅用于内部状态更新，不发送事件
+            android.util.Log.d("MediaPlayerPlugin", "Plugin received media item transition")
         }
         
         override fun onIsPlayingChanged(isPlaying: Boolean) {
-            eventSink?.success(mapOf(
-                "type" to "playbackStateChanged",
-                "data" to if (isPlaying) "playing" else "paused"
-            ))
-        }
-        
-        override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-            eventSink?.success(mapOf(
-                "type" to "error",
-                "data" to (error.message ?: "Unknown error")
-            ))
-        }
-        
-        override fun onIsLoadingChanged(isLoading: Boolean) {
-            eventSink?.success(mapOf(
-                "type" to "bufferingChanged",
-                "data" to isLoading
-            ))
-            
-            // 如果不在缓冲状态，发送缓冲进度
-            if (!isLoading) {
-                notifyBufferProgress()
-            }
-        }
-        
-        override fun onPositionDiscontinuity(
-            oldPosition: Player.PositionInfo,
-            newPosition: Player.PositionInfo,
-            reason: Int
-        ) {
-            eventSink?.success(mapOf(
-                "type" to "positionChanged",
-                "data" to newPosition.positionMs
-            ))
+            // 仅用于内部状态更新，不发送事件
+            android.util.Log.d("MediaPlayerPlugin", "Plugin received is playing changed: $isPlaying")
         }
     }
     
@@ -164,9 +189,20 @@ class MediaPlayerPlugin : FlutterPlugin, MethodCallHandler {
         try {
             when (call.method) {
                 "initialize" -> {
+                    android.util.Log.d("MediaPlayerPlugin", "Starting initialization")
+                    // 先确保服务已启动
                     val intent = Intent(context, MediaPlayerService::class.java)
                     context.startService(intent)
+                    android.util.Log.d("MediaPlayerPlugin", "Service started")
+                    
+                    // 如果 controller 为空，重新初始化
+                    if (controller == null) {
+                        android.util.Log.d("MediaPlayerPlugin", "Controller is null, reinitializing")
+                        initializeController()
+                    }
+                    
                     result.success(null)
+                    android.util.Log.d("MediaPlayerPlugin", "Initialization completed")
                 }
                 "setPlaylist" -> {
                     val playlist = call.argument<List<Map<String, Any>>>("playlist")
@@ -280,6 +316,7 @@ class MediaPlayerPlugin : FlutterPlugin, MethodCallHandler {
                 "setPlayMode" -> {
                     val mode = call.argument<String>("mode")
                     mode?.let {
+                        android.util.Log.d("MediaPlayerPlugin", "Setting play mode: $mode")
                         val playMode = when (it) {
                             "all" -> MediaPlayerService.PlayMode.ALL
                             "list" -> MediaPlayerService.PlayMode.LIST
@@ -287,23 +324,31 @@ class MediaPlayerPlugin : FlutterPlugin, MethodCallHandler {
                             "shuffle" -> MediaPlayerService.PlayMode.SHUFFLE
                             else -> MediaPlayerService.PlayMode.LIST
                         }
-                        (controller as? MediaController)?.let { controller ->
-                            when (playMode) {
-                                MediaPlayerService.PlayMode.ALL -> {
-                                    controller.repeatMode = Player.REPEAT_MODE_ALL
-                                    controller.shuffleModeEnabled = false
-                                }
-                                MediaPlayerService.PlayMode.LIST -> {
-                                    controller.repeatMode = Player.REPEAT_MODE_OFF
-                                    controller.shuffleModeEnabled = false
-                                }
-                                MediaPlayerService.PlayMode.ONE -> {
-                                    controller.repeatMode = Player.REPEAT_MODE_ONE
-                                    controller.shuffleModeEnabled = false
-                                }
-                                MediaPlayerService.PlayMode.SHUFFLE -> {
-                                    controller.repeatMode = Player.REPEAT_MODE_ALL
-                                    controller.shuffleModeEnabled = true
+                        
+                        if (mediaService != null) {
+                            android.util.Log.d("MediaPlayerPlugin", "Setting play mode on service")
+                            mediaService?.setPlayMode(playMode)
+                        } else {
+                            android.util.Log.e("MediaPlayerPlugin", "Service not found, setting mode on controller only")
+                            // 如果法获取服���实例，则只在 controller 上设置
+                            (controller as? MediaController)?.let { controller ->
+                                when (playMode) {
+                                    MediaPlayerService.PlayMode.ALL -> {
+                                        controller.repeatMode = Player.REPEAT_MODE_ALL
+                                        controller.shuffleModeEnabled = false
+                                    }
+                                    MediaPlayerService.PlayMode.LIST -> {
+                                        controller.repeatMode = Player.REPEAT_MODE_OFF
+                                        controller.shuffleModeEnabled = false
+                                    }
+                                    MediaPlayerService.PlayMode.ONE -> {
+                                        controller.repeatMode = Player.REPEAT_MODE_ONE
+                                        controller.shuffleModeEnabled = false
+                                    }
+                                    MediaPlayerService.PlayMode.SHUFFLE -> {
+                                        controller.repeatMode = Player.REPEAT_MODE_ALL
+                                        controller.shuffleModeEnabled = true
+                                    }
                                 }
                             }
                         }
@@ -317,6 +362,7 @@ class MediaPlayerPlugin : FlutterPlugin, MethodCallHandler {
                         controller?.repeatMode == Player.REPEAT_MODE_ALL -> "all"
                         else -> "list"
                     }
+                    android.util.Log.d("MediaPlayerPlugin", "Current play mode: $mode")
                     result.success(mode)
                 }
                 "showVideoView" -> {
@@ -393,6 +439,8 @@ class MediaPlayerPlugin : FlutterPlugin, MethodCallHandler {
         controllerFuture?.cancel(true)
         serviceJob.cancel()
         videoViewFactory = null
+        MediaPlayerService.setEventListener(null)
+        mediaService = null
     }
 
     private fun handleError(error: Exception, result: Result) {

@@ -132,6 +132,7 @@ class MethodChannelMediaPlayer extends MediaPlayerPlatform {
 
   @override
   Future<void> setPlayMode(PlayMode mode) {
+    print('setPlayMode: ${mode.toString().split('.').last}');
     return methodChannel.invokeMethod('setPlayMode', {
       'mode': mode.toString().split('.').last,
     });
