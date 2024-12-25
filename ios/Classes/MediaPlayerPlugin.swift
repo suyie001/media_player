@@ -102,6 +102,18 @@ public class MediaPlayerPlugin: NSObject, FlutterPlugin {
             }
             mediaPlayer.move(from, to)
             result(nil)
+
+        case "updateAt":
+            guard let args = call.arguments as? [String: Any],
+                  let index = args["index"] as? Int,
+                  let mediaItem = args["mediaItem"] as? [String: Any] else {
+                result(FlutterError(code: "INVALID_ARGUMENT",
+                                  message: "Index and mediaItem are required",
+                                  details: nil))
+                return
+            }
+            mediaPlayer.updateAt(index, mediaItem)
+            result(nil)
             
         case "jumpTo":
             guard let args = call.arguments as? [String: Any],

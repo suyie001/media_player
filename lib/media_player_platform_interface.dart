@@ -175,6 +175,11 @@ abstract class MediaPlayerPlatform extends PlatformInterface {
     throw UnimplementedError('move() has not been implemented.');
   }
 
+  /// 更新指定位置的媒体项
+  Future<void> updateAt(int index, MediaItem mediaItem) {
+    throw UnimplementedError('updateAt() has not been implemented.');
+  }
+
   /// 跳转到指定位置的媒体项
   Future<void> jumpTo(int index) {
     throw UnimplementedError('jumpTo() has not been implemented.');

@@ -127,6 +127,11 @@ class MediaPlayer {
     return MediaPlayerPlatform.instance.move(from, to);
   }
 
+  /// 更新指定位置的媒体项
+  Future<void> updateAt(int index, MediaItem mediaItem) {
+    return MediaPlayerPlatform.instance.updateAt(index, mediaItem);
+  }
+
   /// 跳转到指定位置的媒体项
   Future<void> jumpTo(int index) {
     return MediaPlayerPlatform.instance.jumpTo(index);

@@ -116,6 +116,14 @@ class MethodChannelMediaPlayer extends MediaPlayerPlatform {
   }
 
   @override
+  Future<void> updateAt(int index, MediaItem mediaItem) {
+    return methodChannel.invokeMethod('updateAt', {
+      'index': index,
+      'mediaItem': mediaItem.toMap(),
+    });
+  }
+
+  @override
   Future<void> jumpTo(int index) {
     return methodChannel.invokeMethod('jumpTo', {
       'index': index,
