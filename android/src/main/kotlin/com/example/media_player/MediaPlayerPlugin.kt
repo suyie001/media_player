@@ -46,9 +46,9 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
     private val serviceScope = CoroutineScope(Dispatchers.Main + serviceJob)
     private var videoViewFactory: VideoPlayerViewFactory? = null
     private var flutterEngine: FlutterEngine? = null
-    // 添加播放历史记录
     private val playHistory = mutableListOf<Int>()
     private var currentPlayMode = PlayMode.LIST
+    private var notificationManager: NotificationManager? = null
 
     // 播放模式枚举
     enum class PlayMode {
@@ -86,9 +86,19 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
         methodChannel = MethodChannel(messenger, "media_player")
         eventChannel = EventChannel(messenger, "media_player_events")
         
-        Handler(Looper.getMainLooper()).post {
-            initializePlayer()
-        }
+        // 设置方法通道
+        methodChannel.setMethodCallHandler(this)
+        
+        // 设置事件通道
+        eventChannel.setStreamHandler(object : EventChannel.StreamHandler {
+            override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                eventSink = events
+            }
+
+            override fun onCancel(arguments: Any?) {
+                eventSink = null
+            }
+        })
     }
 
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
@@ -138,12 +148,12 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
                 )
                 .setHandleAudioBecomingNoisy(true)
                 .build()
-
-            // 添加播放器监听
-            player?.addListener(playerListener)
-
-            // 添加定期位置更新
-            player?.addPeriodicTimeUpdateListener()
+                .apply {
+                    // 立即添加监听器
+                    addListener(playerListener)
+                    // 添加定期位置更新
+                    addPeriodicTimeUpdateListener()
+                }
 
             // 创建 MediaSession
             mediaSession = player?.let { 
@@ -153,22 +163,13 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
                     .build()
             }
 
-            // 设置方法通道
-            methodChannel.setMethodCallHandler(this)
+            // 初始化通知管理器
+            notificationManager = NotificationManager(context)
 
-            // 设置事件通道
-            eventChannel.setStreamHandler(object : EventChannel.StreamHandler {
-                override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
-                    eventSink = events
-                }
-
-                override fun onCancel(arguments: Any?) {
-                    eventSink = null
-                }
-            })
-
+            Log.d("MediaPlayerPlugin", "Player initialized successfully")
         } catch (e: Exception) {
             Log.e("MediaPlayerPlugin", "Failed to initialize player", e)
+            throw e
         }
     }
 
@@ -537,8 +538,6 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
     }
 
     private fun setupNotification(mediaItem: MediaItem) {
-        startPlaybackService()
-        
         // 创建返回应用的 Intent
         val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
         val pendingIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -557,14 +556,14 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
             )
         }
 
-        mediaSession?.let { session ->
-            playbackService?.setupNotification(
-                session,
-                mediaItem.mediaMetadata.title?.toString() ?: "Unknown",
-                mediaItem.mediaMetadata.artist?.toString(),
-                mediaItem.mediaMetadata.artworkUri?.toString(),
-                pendingIntent
-            )
+        player?.let { player ->
+            mediaSession?.let { session ->
+                notificationManager?.createNotification(
+                    player,
+                    session,
+                    pendingIntent
+                )
+            }
         }
     }
 
@@ -633,10 +632,22 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
     override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
         when (call.method) {
             "initialize" -> {
-                if (player == null) {
-                    initializePlayer()
+                try {
+                    Handler(Looper.getMainLooper()).post {
+                        try {
+                            if (player == null) {
+                                initializePlayer()
+                            }
+                            result.success(null)
+                        } catch (e: Exception) {
+                            Log.e("MediaPlayerPlugin", "Error initializing player", e)
+                            result.error("INIT_ERROR", e.message, null)
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("MediaPlayerPlugin", "Error posting to main thread", e)
+                    result.error("INIT_ERROR", e.message, null)
                 }
-                result.success(null)
             }
             "setPlaylist" -> {
                 try {
@@ -937,14 +948,7 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
         methodChannel.setMethodCallHandler(null)
         eventChannel.setStreamHandler(null)
         
-        if (isServiceBound) {
-            try {
-                context.unbindService(serviceConnection)
-            } catch (e: Exception) {
-                Log.e("MediaPlayerPlugin", "Error unbinding service", e)
-            }
-            isServiceBound = false
-        }
+        notificationManager?.hideNotification()
         
         mediaSession?.release()
         player?.release()
