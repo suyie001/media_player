@@ -9,14 +9,11 @@
 
   <application>
     <service
-      android:name=".MediaPlayerService"
-      android:exported="true"
-      android:enabled="true"
-      android:foregroundServiceType="mediaPlayback">
+      android:name=".PlaybackService"
+      android:foregroundServiceType="mediaPlayback"
+      android:exported="false">
       <intent-filter>
         <action android:name="androidx.media3.session.MediaSessionService"/>
-        <action android:name="android.media.browse.MediaBrowserService" />
-        <action android:name="com.example.media_player.BIND_CUSTOM" />
       </intent-filter>
     </service>
   </application>

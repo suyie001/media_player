@@ -35,18 +35,31 @@ android {
 dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-guava:1.7.3'
     
     // Media3 dependencies
-    def media3_version = "1.2.0"
+    def media3_version = "1.4.0-alpha01"
     implementation "androidx.media3:media3-exoplayer:$media3_version"
-    implementation "androidx.media3:media3-session:$media3_version"
-    implementation "androidx.media3:media3-common:$media3_version"
+    implementation "androidx.media3:media3-exoplayer-dash:$media3_version"
     implementation "androidx.media3:media3-ui:$media3_version"
+    implementation "androidx.media3:media3-exoplayer-hls:$media3_version"
+    implementation "androidx.media3:media3-exoplayer-smoothstreaming:$media3_version"
+    implementation "androidx.media3:media3-exoplayer-rtsp:$media3_version"
+    implementation("androidx.media3:media3-common:$media3_version")
+    implementation "androidx.media3:media3-session:$media3_version"
+
+    // Glide
+    implementation 'com.github.bumptech.glide:glide:4.16.0'
+
+    implementation "com.google.guava:guava:31.1-android"
     
     // AndroidX dependencies
     implementation 'androidx.core:core-ktx:1.12.0'
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'androidx.media:media:1.6.0'
+    
+    // Flutter engine
+    compileOnly 'io.flutter:flutter_embedding_debug:1.0.0-3316dd8728419ad3534e3f6112aa6291f587078a'
     
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.mockito:mockito-core:5.0.0'
