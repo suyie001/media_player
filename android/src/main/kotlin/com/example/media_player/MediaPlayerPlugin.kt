@@ -82,11 +82,15 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
 
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
         activity = binding.activity
-        // 注册视频视图工厂
-        videoViewFactory = player?.let { VideoPlayerViewFactory(context, it) }
-        videoViewFactory?.let {
+        // 确保在主线程中初始化和注册视频视图工厂
+        Handler(Looper.getMainLooper()).post {
+            if (player == null) {
+                initializePlayer()
+            }
+            // 创建并注册视频视图工厂
+            videoViewFactory = VideoPlayerViewFactory(context, player!!)
             flutterEngine?.platformViewsController?.registry
-                ?.registerViewFactory("media_player_video_view", it)
+                ?.registerViewFactory("media_player_video_view", videoViewFactory!!)
         }
     }
 
@@ -183,6 +187,33 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
 
         override fun onTimelineChanged(timeline: Timeline, reason: Int) {
             notifyPlaylistChanged()
+        }
+
+        override fun onRepeatModeChanged(repeatMode: Int) {
+            val mode = when (repeatMode) {
+                Player.REPEAT_MODE_ONE -> "single"
+                Player.REPEAT_MODE_ALL -> "all"
+                else -> "off"
+            }
+            notifyPlaybackModeChanged(mode)
+        }
+
+        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+            val state = if (playWhenReady) "playing" else "paused"
+            notifyPlaybackStateChanged(state)
+        }
+
+        override fun onPlayerError(error: PlaybackException) {
+            val event = mapOf(
+                "type" to "error",
+                "data" to mapOf(
+                    "code" to error.errorCode,
+                    "message" to error.message
+                )
+            )
+            activity?.runOnUiThread {
+                eventSink?.success(event)
+            }
         }
     }
 
@@ -493,7 +524,22 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
                     result.error("PLAYLIST_ERROR", e.message, null)
                 }
             }
-            "skipToIndex" -> {
+            "setPlayMode" -> {
+                try {
+                    val mode = call.argument<String>("mode") ?: "all"
+                    player?.repeatMode = when (mode) {
+                        "single" -> Player.REPEAT_MODE_ONE
+                        "all" -> Player.REPEAT_MODE_ALL
+                        else -> Player.REPEAT_MODE_OFF
+                    }
+                    notifyPlaybackModeChanged(mode)
+                    result.success(null)
+                } catch (e: Exception) {
+                    Log.e("MediaPlayerPlugin", "Error setting play mode", e)
+                    result.error("PLAYER_ERROR", e.message, null)
+                }
+            }
+            "jumpTo" -> {
                 try {
                     val index = call.argument<Int>("index")
                     if (index != null) {
@@ -503,7 +549,7 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
                         result.error("INVALID_ARGUMENT", "Index cannot be null", null)
                     }
                 } catch (e: Exception) {
-                    Log.e("MediaPlayerPlugin", "Error skipping to index", e)
+                    Log.e("MediaPlayerPlugin", "Error jumping to index", e)
                     result.error("PLAYLIST_ERROR", e.message, null)
                 }
             }
@@ -532,7 +578,136 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
                     result.error("PLAYLIST_ERROR", e.message, null)
                 }
             }
+            "setLooping" -> {
+                try {
+                    val looping = call.argument<Boolean>("looping") ?: false
+                    player?.repeatMode = if (looping) Player.REPEAT_MODE_ALL else Player.REPEAT_MODE_OFF
+                    result.success(null)
+                } catch (e: Exception) {
+                    Log.e("MediaPlayerPlugin", "Error setting looping", e)
+                    result.error("PLAYER_ERROR", e.message, null)
+                }
+            }
+            "setVolume" -> {
+                try {
+                    val volume = call.argument<Double>("volume") ?: 1.0
+                    player?.volume = volume.toFloat()
+                    result.success(null)
+                } catch (e: Exception) {
+                    Log.e("MediaPlayerPlugin", "Error setting volume", e)
+                    result.error("PLAYER_ERROR", e.message, null)
+                }
+            }
+            "setSpeed" -> {
+                try {
+                    val speed = call.argument<Double>("speed") ?: 1.0
+                    player?.setPlaybackSpeed(speed.toFloat())
+                    result.success(null)
+                } catch (e: Exception) {
+                    Log.e("MediaPlayerPlugin", "Error setting speed", e)
+                    result.error("PLAYER_ERROR", e.message, null)
+                }
+            }
+            "getPosition" -> {
+                try {
+                    val position = player?.currentPosition ?: 0
+                    result.success(position)
+                } catch (e: Exception) {
+                    Log.e("MediaPlayerPlugin", "Error getting position", e)
+                    result.error("PLAYER_ERROR", e.message, null)
+                }
+            }
+            "getDuration" -> {
+                try {
+                    val duration = player?.duration ?: 0
+                    result.success(duration)
+                } catch (e: Exception) {
+                    Log.e("MediaPlayerPlugin", "Error getting duration", e)
+                    result.error("PLAYER_ERROR", e.message, null)
+                }
+            }
+            "isPlaying" -> {
+                try {
+                    val isPlaying = player?.isPlaying ?: false
+                    result.success(isPlaying)
+                } catch (e: Exception) {
+                    Log.e("MediaPlayerPlugin", "Error checking playing state", e)
+                    result.error("PLAYER_ERROR", e.message, null)
+                }
+            }
+            "getBufferedPosition" -> {
+                try {
+                    val bufferedPosition = player?.bufferedPosition ?: 0
+                    result.success(bufferedPosition)
+                } catch (e: Exception) {
+                    Log.e("MediaPlayerPlugin", "Error getting buffered position", e)
+                    result.error("PLAYER_ERROR", e.message, null)
+                }
+            }
+            "setPlaybackMode" -> {
+                try {
+                    val mode = call.argument<String>("mode") ?: "all"
+                    player?.repeatMode = when (mode) {
+                        "single" -> Player.REPEAT_MODE_ONE
+                        "all" -> Player.REPEAT_MODE_ALL
+                        else -> Player.REPEAT_MODE_OFF
+                    }
+                    notifyPlaybackModeChanged(mode)
+                    result.success(null)
+                } catch (e: Exception) {
+                    Log.e("MediaPlayerPlugin", "Error setting playback mode", e)
+                    result.error("PLAYER_ERROR", e.message, null)
+                }
+            }
+            "getPlaybackMode" -> {
+                try {
+                    val mode = when (player?.repeatMode) {
+                        Player.REPEAT_MODE_ONE -> "single"
+                        Player.REPEAT_MODE_ALL -> "all"
+                        else -> "off"
+                    }
+                    result.success(mode)
+                } catch (e: Exception) {
+                    Log.e("MediaPlayerPlugin", "Error getting playback mode", e)
+                    result.error("PLAYER_ERROR", e.message, null)
+                }
+            }
+            "move" -> {
+                try {
+                    val from = call.argument<Int>("from") ?: 0
+                    val to = call.argument<Int>("to") ?: 0
+                    player?.moveMediaItem(from, to)
+                    notifyPlaylistChanged()
+                    result.success(null)
+                } catch (e: Exception) {
+                    Log.e("MediaPlayerPlugin", "Error moving playlist item", e)
+                    result.error("PLAYLIST_ERROR", e.message, null)
+                }
+            }
+            "skipToNext" -> {
+                try {
+                    if (player?.hasNextMediaItem() == true) {
+                        player?.seekToNextMediaItem()
+                        result.success(null)
+                    } else {
+                        result.error("PLAYER_ERROR", "No next item available", null)
+                    }
+                } catch (e: Exception) {
+                    Log.e("MediaPlayerPlugin", "Error skipping to next", e)
+                    result.error("PLAYER_ERROR", e.message, null)
+                }
+            }
             else -> result.notImplemented()
+        }
+    }
+
+    private fun notifyPlaybackModeChanged(mode: String) {
+        val event = mapOf(
+            "type" to "playbackModeChanged",
+            "data" to mode
+        )
+        activity?.runOnUiThread {
+            eventSink?.success(event)
         }
     }
 
