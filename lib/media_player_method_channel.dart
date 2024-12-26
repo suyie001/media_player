@@ -173,4 +173,11 @@ class MethodChannelMediaPlayer extends MediaPlayerPlatform {
   Future<void> stopPictureInPicture() async {
     await methodChannel.invokeMethod('stopPictureInPicture');
   }
+
+  @override
+  Future<void> setLoggingEnabled(bool enabled) {
+    return methodChannel.invokeMethod('setLoggingEnabled', {
+      'enabled': enabled,
+    });
+  }
 }

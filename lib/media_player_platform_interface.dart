@@ -41,7 +41,7 @@ class MediaItem {
         artworkUrl: map['artworkUrl'],
       );
 
-  /// 创建一个新的 MediaItem，可以选择性地���新某些字段
+  /// 创建一个新的 MediaItem，可以选择性地����新某些字段
   MediaItem copyWith({
     String? id,
     String? title,
@@ -218,5 +218,9 @@ abstract class MediaPlayerPlatform extends PlatformInterface {
   /// 停止画中画
   Future<void> stopPictureInPicture() {
     throw UnimplementedError('stopPictureInPicture() has not been implemented.');
+  }
+
+  Future<void> setLoggingEnabled(bool enabled) {
+    throw UnimplementedError('setLoggingEnabled() has not been implemented.');
   }
 }

@@ -5,6 +5,8 @@ import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.content.BroadcastReceiver
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -49,6 +51,8 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
     private val playHistory = mutableListOf<Int>()
     private var currentPlayMode = PlayMode.LIST
     private var notificationManager: NotificationManager? = null
+    private var screenReceiver: BroadcastReceiver? = null
+    private var isLoggingEnabled = false
 
     // 播放模式枚举
     enum class PlayMode {
@@ -112,6 +116,52 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
             videoViewFactory = VideoPlayerViewFactory(context, player!!)
             flutterEngine?.platformViewsController?.registry
                 ?.registerViewFactory("media_player_video_view", videoViewFactory!!)
+            
+            // 注册屏幕锁定广播接收器
+            registerScreenReceiver()
+        }
+    }
+
+    private fun registerScreenReceiver() {
+        if (screenReceiver == null) {
+            screenReceiver = object : BroadcastReceiver() {
+                override fun onReceive(context: Context?, intent: Intent?) {
+                    when (intent?.action) {
+                        Intent.ACTION_SCREEN_OFF -> {
+                            log("MediaPlayerPlugin", "Screen turned off")
+                            Handler(Looper.getMainLooper()).postDelayed({
+                                player?.currentMediaItem?.let { mediaItem ->
+                                    setupNotification(mediaItem)
+                                }
+                            }, 1000)
+                        }
+                        Intent.ACTION_USER_PRESENT -> {
+                            log("MediaPlayerPlugin", "Screen unlocked")
+                            player?.currentMediaItem?.let { mediaItem ->
+                                setupNotification(mediaItem)
+                            }
+                        }
+                    }
+                }
+            }
+
+            val filter = IntentFilter().apply {
+                addAction(Intent.ACTION_SCREEN_OFF)
+                addAction(Intent.ACTION_USER_PRESENT)
+            }
+            
+            context.registerReceiver(screenReceiver, filter)
+        }
+    }
+
+    private fun unregisterScreenReceiver() {
+        screenReceiver?.let {
+            try {
+                context.unregisterReceiver(it)
+                screenReceiver = null
+            } catch (e: Exception) {
+                Log.e("MediaPlayerPlugin", "Error unregistering screen receiver", e)
+            }
         }
     }
 
@@ -149,13 +199,10 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
                 .setHandleAudioBecomingNoisy(true)
                 .build()
                 .apply {
-                    // 立即添加监听器
                     addListener(playerListener)
-                    // 添加定期位置更新
                     addPeriodicTimeUpdateListener()
                 }
 
-            // 创建 MediaSession
             mediaSession = player?.let { 
                 MediaSession.Builder(context, it)
                     .setCallback(mediaSessionCallback)
@@ -163,12 +210,11 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
                     .build()
             }
 
-            // 初始化通知管理器
             notificationManager = NotificationManager(context)
 
-            Log.d("MediaPlayerPlugin", "Player initialized successfully")
+            log("MediaPlayerPlugin", "Player initialized successfully")
         } catch (e: Exception) {
-            Log.e("MediaPlayerPlugin", "Failed to initialize player", e)
+            log("MediaPlayerPlugin", "Failed to initialize player: ${e.message}", true)
             throw e
         }
     }
@@ -629,6 +675,29 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
         }
     }
 
+    private fun log(tag: String, message: String, isError: Boolean = false) {
+        if (isLoggingEnabled) {
+            if (isError) {
+                Log.e(tag, message)
+            } else {
+                Log.d(tag, message)
+            }
+            // 发送日志事件到 Flutter
+            val event = mapOf(
+                "type" to "log",
+                "data" to mapOf(
+                    "tag" to tag,
+                    "message" to message,
+                    "isError" to isError,
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+            activity?.runOnUiThread {
+                eventSink?.success(event)
+            }
+        }
+    }
+
     override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
         when (call.method) {
             "initialize" -> {
@@ -940,6 +1009,15 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
                     result.error("PLAYER_ERROR", e.message, null)
                 }
             }
+            "setLoggingEnabled" -> {
+                try {
+                    isLoggingEnabled = call.argument<Boolean>("enabled") ?: false
+                    log("MediaPlayerPlugin", "Logging ${if (isLoggingEnabled) "enabled" else "disabled"}")
+                    result.success(null)
+                } catch (e: Exception) {
+                    result.error("LOGGING_ERROR", e.message, null)
+                }
+            }
             else -> result.notImplemented()
         }
     }
@@ -949,6 +1027,7 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
         eventChannel.setStreamHandler(null)
         
         notificationManager?.hideNotification()
+        unregisterScreenReceiver()
         
         mediaSession?.release()
         player?.release()

@@ -8,6 +8,9 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
 import android.support.v4.media.session.MediaSessionCompat
 import androidx.core.app.NotificationCompat
 import androidx.media3.common.Player
@@ -54,57 +57,80 @@ class NotificationManager(
     fun createNotification(
         player: Player,
         mediaSession: MediaSession,
-        pendingIntent: PendingIntent
+        pendingIntent: PendingIntent,
+        retryCount: Int = 3
     ) {
         if (playerNotificationManager == null) {
-            playerNotificationManager = PlayerNotificationManager.Builder(
-                context,
-                notificationId,
-                channelId
-            )
-                .setMediaDescriptionAdapter(
-                    MediaDescriptionAdapter(
-                        context,
-                        pendingIntent
+            try {
+                playerNotificationManager = PlayerNotificationManager.Builder(
+                    context,
+                    notificationId,
+                    channelId
+                )
+                    .setMediaDescriptionAdapter(
+                        MediaDescriptionAdapter(
+                            context,
+                            pendingIntent
+                        )
                     )
-                )
-                .setChannelNameResourceId(R.string.notification_channel_name)
-                .setChannelDescriptionResourceId(R.string.notification_channel_description)
-                .setSmallIconResourceId(R.drawable.ic_notification)
-                .setNotificationListener(
-                    object : PlayerNotificationManager.NotificationListener {
-                        override fun onNotificationCancelled(notificationId: Int, dismissedByUser: Boolean) {
-                            // 用户关闭通知时的处理
-                            player.pause()
-                        }
+                    .setChannelNameResourceId(R.string.notification_channel_name)
+                    .setChannelDescriptionResourceId(R.string.notification_channel_description)
+                    .setSmallIconResourceId(R.drawable.ic_notification)
+                    .setNotificationListener(
+                        object : PlayerNotificationManager.NotificationListener {
+                            override fun onNotificationCancelled(notificationId: Int, dismissedByUser: Boolean) {
+                                // 用户关闭通知时的处理
+                                player.pause()
+                            }
 
-                        override fun onNotificationPosted(
-                            notificationId: Int,
-                            notification: android.app.Notification,
-                            ongoing: Boolean
-                        ) {
-                            // 通知显示时的处理
+                            override fun onNotificationPosted(
+                                notificationId: Int,
+                                notification: android.app.Notification,
+                                ongoing: Boolean
+                            ) {
+                                // 通知显示时的处理
+                                Log.d("NotificationManager", "Notification posted successfully")
+                            }
                         }
+                    )
+                    .build()
+                    .apply {
+                        setMediaSessionToken(mediaSession.sessionCompatToken)
+                        setUseNextActionInCompactView(true)
+                        setUsePreviousActionInCompactView(true)
+                        setUsePlayPauseActions(true)
+                        setUseStopAction(false)
+                        setPlayer(player)
                     }
-                )
-                .build()
-                .apply {
-                    setMediaSessionToken(mediaSession.sessionCompatToken)
-                    setUseNextActionInCompactView(true)
-                    setUsePreviousActionInCompactView(true)
-                    setUsePlayPauseActions(true)
-                    setUseStopAction(false)
-                    setPlayer(player)
+            } catch (e: Exception) {
+                Log.e("NotificationManager", "Error creating notification", e)
+                if (retryCount > 0) {
+                    Log.d("NotificationManager", "Retrying notification creation, attempts left: ${retryCount - 1}")
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        createNotification(player, mediaSession, pendingIntent, retryCount - 1)
+                    }, 1000)
                 }
+            }
+        } else {
+            playerNotificationManager?.setPlayer(player)
+            updateNotification()
         }
     }
 
     fun updateNotification() {
-        playerNotificationManager?.invalidate()
+        try {
+            playerNotificationManager?.invalidate()
+        } catch (e: Exception) {
+            Log.e("NotificationManager", "Error updating notification", e)
+        }
     }
 
     fun hideNotification() {
-        playerNotificationManager?.setPlayer(null)
+        try {
+            playerNotificationManager?.setPlayer(null)
+        } catch (e: Exception) {
+            Log.e("NotificationManager", "Error hiding notification", e)
+        }
     }
 
     private inner class MediaDescriptionAdapter(

@@ -98,6 +98,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  harmony_plugin:
+    dependency: "direct main"
+    description:
+      name: harmony_plugin
+      sha256: b4f212dcfdcc8ce0ee62a1c527f11ac6d83921b4d6e990a3185de1dce356cc18
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.1.0"
   integration_test:
     dependency: "direct dev"
     description: flutter

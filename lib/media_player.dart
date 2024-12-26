@@ -47,6 +47,9 @@ class MediaPlayer {
   /// 获取播放模式变化流
   Stream<PlayMode> get playModeStream => _eventChannel.playModeStream;
 
+  /// 获取日志流
+  Stream<LogData> get logStream => _eventChannel.logStream;
+
   /// 初始化播放器
   Future<void> initialize() {
     return MediaPlayerPlatform.instance.initialize();
@@ -166,5 +169,10 @@ class MediaPlayer {
 
   Future<void> stopPictureInPicture() async {
     await MediaPlayerPlatform.instance.stopPictureInPicture();
+  }
+
+  /// 启用或禁用日志
+  Future<void> setLoggingEnabled(bool enabled) {
+    return MediaPlayerPlatform.instance.setLoggingEnabled(enabled);
   }
 }

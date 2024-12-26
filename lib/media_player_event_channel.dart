@@ -29,7 +29,32 @@ enum MediaPlayerEventType {
   bufferingChanged,
   errorOccurred,
   playModeChanged,
+  log,
   unknown,
+}
+
+/// 日志事件数据
+class LogData {
+  final String tag;
+  final String message;
+  final bool isError;
+  final DateTime timestamp;
+
+  LogData({
+    required this.tag,
+    required this.message,
+    required this.isError,
+    required this.timestamp,
+  });
+
+  factory LogData.fromMap(Map<String, dynamic> map) {
+    return LogData(
+      tag: map['tag'] as String,
+      message: map['message'] as String,
+      isError: map['isError'] as bool,
+      timestamp: DateTime.fromMillisecondsSinceEpoch(map['timestamp'] as int),
+    );
+  }
 }
 
 /// 事件通道管理器
@@ -85,10 +110,14 @@ class MediaPlayerEventChannel {
   /// 获取错误流
   Stream<String> get errorStream => eventStream.where((event) => event.type == MediaPlayerEventType.errorOccurred).map((event) => event.data.toString());
 
-  /// 获取播放模式变化流
+  /// 获取播���模式变化流
   Stream<PlayMode> get playModeStream =>
       eventStream.where((event) => event.type == MediaPlayerEventType.playModeChanged).map((event) => PlayMode.values.firstWhere(
             (e) => e.toString().split('.').last == event.data,
             orElse: () => PlayMode.list,
           ));
+
+  /// 获取日志流
+  Stream<LogData> get logStream =>
+      eventStream.where((event) => event.type == MediaPlayerEventType.log).map((event) => LogData.fromMap(Map<String, dynamic>.from(event.data as Map)));
 }
