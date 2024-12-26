@@ -182,7 +182,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
   Future<void> checkoutToAudio() async {
     Duration position = _position;
-    await _player.updateCurrentUrl('http://oss-api-audio.zuidie.net/audio/MP3L/94703ba232f343a6b4a0c970c6eaa6d1.mp3');
+    // await _player.updateCurrentUrl('http://oss-api-audio.zuidie.net/audio/MP3L/94703ba232f343a6b4a0c970c6eaa6d1.mp3');
     await _player.seekTo(position);
     await _player.play();
   }

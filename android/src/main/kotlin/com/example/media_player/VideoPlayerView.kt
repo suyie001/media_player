@@ -17,9 +17,12 @@ class VideoPlayerView(
     private val playerView: PlayerView = PlayerView(context).apply {
         this.player = this@VideoPlayerView.player
         useController = false  // 禁用默认控制器
-        setKeepContentOnPlayerReset(true)  // 保持内容在播放器重置时不消失
-        setShowBuffering(PlayerView.SHOW_BUFFERING_ALWAYS)  // 显示缓冲状态
+        controllerAutoShow = false  // 禁用控制器自动显示
+        controllerHideOnTouch = true  // 触摸时隐藏控制器
+        setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)  // 从不显示缓冲状态
         resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT  // 设置视频缩放模式
+        setKeepContentOnPlayerReset(true)  // 保持内容在播放器重置时不消失
+        hideController()  // 确保控制器隐藏
     }
 
     init {

@@ -46,6 +46,17 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
     private val serviceScope = CoroutineScope(Dispatchers.Main + serviceJob)
     private var videoViewFactory: VideoPlayerViewFactory? = null
     private var flutterEngine: FlutterEngine? = null
+    // 添加播放历史记录
+    private val playHistory = mutableListOf<Int>()
+    private var currentPlayMode = PlayMode.LIST
+
+    // 播放模式枚举
+    enum class PlayMode {
+        ALL,    // 列表循环
+        LIST,   // 列表播放一次
+        ONE,    // 单曲循环
+        SHUFFLE // 随机播放
+    }
 
     private lateinit var methodChannel: MethodChannel
     private lateinit var eventChannel: EventChannel
@@ -131,7 +142,10 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
             // 添加播放器监听
             player?.addListener(playerListener)
 
-            // �� MediaSession
+            // 添加定期位置更新
+            player?.addPeriodicTimeUpdateListener()
+
+            // 创建 MediaSession
             mediaSession = player?.let { 
                 MediaSession.Builder(context, it)
                     .setCallback(mediaSessionCallback)
@@ -158,6 +172,45 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
         }
     }
 
+    private fun Player.addPeriodicTimeUpdateListener() {
+        val handler = Handler(Looper.getMainLooper())
+        val updateIntervalMs = 1000L // 每秒更新一次
+        
+        val updateRunnable = object : Runnable {
+            override fun run() {
+                if (isPlaying) {
+                    notifyPositionChanged(currentPosition)
+                }
+                handler.postDelayed(this, updateIntervalMs)
+            }
+        }
+        
+        addListener(object : Player.Listener {
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                if (isPlaying) {
+                    handler.post(updateRunnable)
+                } else {
+                    handler.removeCallbacks(updateRunnable)
+                    // 暂停时也发送一次位置更新
+                    notifyPositionChanged(currentPosition)
+                }
+            }
+            
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                when (playbackState) {
+                    Player.STATE_ENDED -> {
+                        handler.removeCallbacks(updateRunnable)
+                        notifyPositionChanged(duration)
+                    }
+                    Player.STATE_IDLE -> {
+                        handler.removeCallbacks(updateRunnable)
+                        notifyPositionChanged(0)
+                    }
+                }
+            }
+        })
+    }
+
     private var eventSink: EventChannel.EventSink? = null
 
     private val playerListener = object : Player.Listener {
@@ -165,8 +218,17 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
             val state = when (playbackState) {
                 Player.STATE_IDLE -> "none"
                 Player.STATE_BUFFERING -> "loading"
-                Player.STATE_READY -> "ready"
-                Player.STATE_ENDED -> "completed"
+                Player.STATE_READY -> {
+                    // 播放器准备好时发送时长
+                    player?.duration?.let { duration ->
+                        notifyDurationChanged(duration)
+                    }
+                    "ready"
+                }
+                Player.STATE_ENDED -> {
+                    notifyCompleted()
+                    "completed"
+                }
                 else -> "unknown"
             }
             notifyPlaybackStateChanged(state)
@@ -187,6 +249,12 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
 
         override fun onTimelineChanged(timeline: Timeline, reason: Int) {
             notifyPlaylistChanged()
+            // 时间线变化时检查时长
+            player?.duration?.let { duration ->
+                if (duration > 0) {
+                    notifyDurationChanged(duration)
+                }
+            }
         }
 
         override fun onRepeatModeChanged(repeatMode: Int) {
@@ -204,16 +272,27 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
         }
 
         override fun onPlayerError(error: PlaybackException) {
-            val event = mapOf(
-                "type" to "error",
-                "data" to mapOf(
-                    "code" to error.errorCode,
-                    "message" to error.message
-                )
-            )
-            activity?.runOnUiThread {
-                eventSink?.success(event)
-            }
+            notifyError(error.message ?: "Unknown error")
+        }
+
+        override fun onPositionDiscontinuity(
+            oldPosition: Player.PositionInfo,
+            newPosition: Player.PositionInfo,
+            reason: Int
+        ) {
+            notifyPositionChanged(newPosition.positionMs)
+        }
+
+        override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
+            // 可以在这里添加播放速度变化的通知，如果需要的话
+        }
+
+        override fun onLoadingChanged(isLoading: Boolean) {
+            notifyBufferingChanged(isLoading)
+        }
+
+        override fun onAvailableCommandsChanged(availableCommands: Player.Commands) {
+            // 可以在这里添加可用命令变化的通知，如果需要的话
         }
     }
 
@@ -372,6 +451,76 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
         }
     }
 
+    private fun notifyPositionChanged(position: Long) {
+        val event = mapOf(
+            "type" to "positionChanged",
+            "data" to position
+        )
+        activity?.runOnUiThread {
+            eventSink?.success(event)
+        }
+    }
+
+    private fun notifyDurationChanged(duration: Long) {
+        val event = mapOf(
+            "type" to "durationChanged",
+            "data" to duration
+        )
+        activity?.runOnUiThread {
+            eventSink?.success(event)
+        }
+    }
+
+    private fun notifyBufferChanged(progress: Double) {
+        val event = mapOf(
+            "type" to "bufferChanged",
+            "data" to progress
+        )
+        activity?.runOnUiThread {
+            eventSink?.success(event)
+        }
+    }
+
+    private fun notifyBufferingChanged(isBuffering: Boolean) {
+        val event = mapOf(
+            "type" to "bufferingChanged",
+            "data" to isBuffering
+        )
+        activity?.runOnUiThread {
+            eventSink?.success(event)
+        }
+    }
+
+    private fun notifyPlaybackModeChanged(mode: String) {
+        val event = mapOf(
+            "type" to "playModeChanged",
+            "data" to mode
+        )
+        activity?.runOnUiThread {
+            eventSink?.success(event)
+        }
+    }
+
+    private fun notifyError(error: String) {
+        val event = mapOf(
+            "type" to "errorOccurred",
+            "data" to error
+        )
+        activity?.runOnUiThread {
+            eventSink?.success(event)
+        }
+    }
+
+    private fun notifyCompleted() {
+        val event = mapOf(
+            "type" to "completed",
+            "data" to true
+        )
+        activity?.runOnUiThread {
+            eventSink?.success(event)
+        }
+    }
+
     private fun startPlaybackService() {
         if (!isServiceBound) {
             val intent = Intent(context, PlaybackService::class.java)
@@ -419,6 +568,68 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
         }
     }
 
+    private fun handleNextItem() {
+        player?.let { exoPlayer ->
+            when (currentPlayMode) {
+                PlayMode.SHUFFLE -> {
+                    // 在随机模式下，记录当前项目到历史
+                    val currentIndex = exoPlayer.currentMediaItemIndex
+                    playHistory.add(currentIndex)
+                    
+                    // 生成一个随机的下一个索引，排除当前正在播放的索引
+                    val mediaItemCount = exoPlayer.mediaItemCount
+                    if (mediaItemCount > 1) {
+                        val availableIndices = (0 until mediaItemCount).filter { it != currentIndex }
+                        val nextIndex = availableIndices.random()
+                        Log.d("MediaPlayerPlugin", "Shuffle next: current=$currentIndex, next=$nextIndex")
+                        exoPlayer.seekToDefaultPosition(nextIndex)
+                    }
+                }
+                else -> {
+                    if (exoPlayer.hasNextMediaItem()) {
+                        exoPlayer.seekToNextMediaItem()
+                    } else if (currentPlayMode == PlayMode.ALL) {
+                        // 列表循环模式下，返回到第一首
+                        exoPlayer.seekToDefaultPosition(0)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun handlePreviousItem() {
+        player?.let { exoPlayer ->
+            when (currentPlayMode) {
+                PlayMode.SHUFFLE -> {
+                    // 在随机模式下，从历史记录中获取上一个项目
+                    if (playHistory.isNotEmpty()) {
+                        val previousIndex = playHistory.removeAt(playHistory.size - 1)
+                        Log.d("MediaPlayerPlugin", "Shuffle previous: going back to $previousIndex")
+                        exoPlayer.seekToDefaultPosition(previousIndex)
+                    } else {
+                        // 如果没有历史记录，随机选择一个不同的索引
+                        val currentIndex = exoPlayer.currentMediaItemIndex
+                        val mediaItemCount = exoPlayer.mediaItemCount
+                        if (mediaItemCount > 1) {
+                            val availableIndices = (0 until mediaItemCount).filter { it != currentIndex }
+                            val randomIndex = availableIndices.random()
+                            Log.d("MediaPlayerPlugin", "Shuffle previous (no history): current=$currentIndex, random=$randomIndex")
+                            exoPlayer.seekToDefaultPosition(randomIndex)
+                        }
+                    }
+                }
+                else -> {
+                    if (exoPlayer.hasPreviousMediaItem()) {
+                        exoPlayer.seekToPreviousMediaItem()
+                    } else if (currentPlayMode == PlayMode.ALL) {
+                        // 列表循环模式下，跳转到最后一首
+                        exoPlayer.seekToDefaultPosition(exoPlayer.mediaItemCount - 1)
+                    }
+                }
+            }
+        }
+    }
+
     override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
         when (call.method) {
             "initialize" -> {
@@ -433,11 +644,7 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
                     if (playlist != null) {
                         val mediaItems = playlist.mapNotNull { item ->
                             try {
-                                val url = item["url"] as? String
-                                if (url == null) {
-                                    Log.e("MediaPlayerPlugin", "Invalid URL in playlist item")
-                                    return@mapNotNull null
-                                }
+                                val url = item["url"] as? String ?: return@mapNotNull null
                                 
                                 MediaItem.Builder()
                                     .setMediaId(item["id"] as? String ?: "")
@@ -472,7 +679,15 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
                         
                         player?.setMediaItems(mediaItems)
                         player?.prepare()
+                        
+                        // 在准备播放器后发送播放列表变化和时长
                         notifyPlaylistChanged()
+                        player?.duration?.let { duration ->
+                            if (duration > 0) {
+                                notifyDurationChanged(duration)
+                            }
+                        }
+                        
                         result.success(null)
                     } else {
                         result.error("INVALID_ARGUMENT", "Playlist is required", null)
@@ -527,10 +742,22 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
             "setPlayMode" -> {
                 try {
                     val mode = call.argument<String>("mode") ?: "all"
-                    player?.repeatMode = when (mode) {
-                        "single" -> Player.REPEAT_MODE_ONE
-                        "all" -> Player.REPEAT_MODE_ALL
+                    Log.d("MediaPlayerPlugin", "setPlayMode: $mode")
+                    currentPlayMode = when (mode) {
+                        "single" -> PlayMode.ONE
+                        "all" -> PlayMode.ALL
+                        "shuffle" -> PlayMode.SHUFFLE
+                        else -> PlayMode.LIST
+                    }
+                    player?.repeatMode = when (currentPlayMode) {
+                        PlayMode.ONE -> Player.REPEAT_MODE_ONE
+                        PlayMode.ALL -> Player.REPEAT_MODE_ALL
+                        PlayMode.SHUFFLE -> Player.REPEAT_MODE_ALL
                         else -> Player.REPEAT_MODE_OFF
+                    }
+                    // 切换到随机模式时清空历史记录
+                    if (currentPlayMode == PlayMode.SHUFFLE) {
+                        playHistory.clear()
                     }
                     notifyPlaybackModeChanged(mode)
                     result.success(null)
@@ -684,30 +911,25 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
                     result.error("PLAYLIST_ERROR", e.message, null)
                 }
             }
+            "skipToPrevious" -> {
+                try {
+                    handlePreviousItem()
+                    result.success(null)
+                } catch (e: Exception) {
+                    Log.e("MediaPlayerPlugin", "Error skipping to previous", e)
+                    result.error("PLAYER_ERROR", e.message, null)
+                }
+            }
             "skipToNext" -> {
                 try {
-                    if (player?.hasNextMediaItem() == true) {
-                        player?.seekToNextMediaItem()
-                        result.success(null)
-                    } else {
-                        result.error("PLAYER_ERROR", "No next item available", null)
-                    }
+                    handleNextItem()
+                    result.success(null)
                 } catch (e: Exception) {
                     Log.e("MediaPlayerPlugin", "Error skipping to next", e)
                     result.error("PLAYER_ERROR", e.message, null)
                 }
             }
             else -> result.notImplemented()
-        }
-    }
-
-    private fun notifyPlaybackModeChanged(mode: String) {
-        val event = mapOf(
-            "type" to "playbackModeChanged",
-            "data" to mode
-        )
-        activity?.runOnUiThread {
-            eventSink?.success(event)
         }
     }
 
