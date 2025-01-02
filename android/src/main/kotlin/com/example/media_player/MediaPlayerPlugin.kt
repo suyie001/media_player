@@ -37,6 +37,7 @@ import com.google.common.util.concurrent.ListenableFuture
 import io.flutter.embedding.engine.FlutterEngine
 import com.google.common.collect.ImmutableList
 import android.app.PictureInPictureParams
+import android.content.pm.PackageManager   
 
 @UnstableApi
 class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
@@ -56,6 +57,7 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
     private var isLoggingEnabled = false
 
     private var supportsPip = false
+    private var isInPipMode = false
 
     // 播放模式枚举
     enum class PlayMode {
@@ -755,16 +757,60 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
             eventSink?.success(event)
         }
     }
-     // 添加 PiP 模式变化监听
-    private val pipModeChangeCallback = object : PictureInPictureParams.Builder.OnPictureInPictureModeChangedListener {
-        override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean) {
-            val event = mapOf(
-                "type" to "pipModeChanged",
-                "data" to isInPictureInPictureMode
-            )
-            activity?.runOnUiThread {
-                eventSink?.success(event)
+   // 添加进入 PiP 模式的方法
+    private fun enterPictureInPictureMode() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            activity?.let { activity ->
+                try {
+                    val params = PictureInPictureParams.Builder()
+                        .setAspectRatio(Rational(16, 9))  // 设置宽高比
+                        .build()
+                    
+                    if (activity.enterPictureInPictureMode(params)) {
+                        isInPipMode = true
+                        notifyPipModeChanged(true)
+                        log("MediaPlayerPlugin", "Entered PiP mode")
+                    }
+                } catch (e: Exception) {
+                    log("MediaPlayerPlugin", "Failed to enter PiP mode: ${e.message}", true)
+                }
             }
+        }
+    }
+    
+    // 监听 PiP 模式变化
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            activity?.let { activity ->
+                val wasInPipMode = isInPipMode
+                isInPipMode = activity.isInPictureInPictureMode
+                if (wasInPipMode != isInPipMode) {
+                    notifyPipModeChanged(isInPipMode)
+                }
+            }
+        }
+    }
+    private fun exitPictureInPictureMode() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            activity?.let { activity ->
+                if (activity.isInPictureInPictureMode) {
+                    // 将应用移回前台
+                    val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+                    intent?.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+                    activity.startActivity(intent)
+                }
+            }
+        }
+    }
+    
+    private fun notifyPipModeChanged(isInPipMode: Boolean) {
+        val event = mapOf(
+            "type" to "pipModeChanged",
+            "data" to isInPipMode
+        )
+        activity?.runOnUiThread {
+            eventSink?.success(event)
         }
     }
 
@@ -1124,8 +1170,16 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
                 }
             }
             "stopPictureInPicture" -> {
-                stopPictureInPicture()
-                result.success(null)
+                 try {
+                    if (supportsPip) {
+                        exitPictureInPictureMode()
+                        result.success(true)
+                    } else {
+                        result.success(false)
+                    }
+                } catch (e: Exception) {
+                    result.error("PIP_ERROR", e.message, null)
+                }
             }
             else -> result.notImplemented()
         }
