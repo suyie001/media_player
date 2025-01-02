@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -489,6 +490,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   }
 
   Future<void> _checkHarmony() async {
+    if (Platform.isIOS) {
+      return;
+    }
     bool isHarmony;
     bool isPureMode;
     String harmonyVersion;

@@ -15,9 +15,14 @@ class MediaPlayerHandler: NSObject, FlutterStreamHandler {
     private var artworkCache: [String: MPMediaItemArtwork] = [:]
     private var playMode: PlayMode = .list // 默认列表模式
     private var playHistory: [Int] = [] // 用于记录播放历史，支持随机模式下的上一曲功能
+    private var isLoggingEnabled: Bool = false
     
     private var eventSink: FlutterEventSink?
     private var pipController: AVPictureInPictureController?
+    
+    var count: Int {
+        return playlist.count
+    }
     
     // 播放模式枚举
     enum PlayMode: String {
@@ -696,7 +701,7 @@ class MediaPlayerHandler: NSObject, FlutterStreamHandler {
             let playerItem = AVPlayerItem(url: url)
             playerItems.insert(playerItem, at: index)
             
-            // 如果插入位置在当前播放项之前或当前位置
+            // 如果插入位置在当前播放项之前当前位置
             if index <= currentIndex {
                 currentIndex += 1
             }
@@ -764,7 +769,7 @@ class MediaPlayerHandler: NSObject, FlutterStreamHandler {
             // 发送播放模式变化事件
             eventSink?(["type": "playModeChanged", "data": mode])
             
-            // 更新远程控制按��状态
+            // 更新远程控制按钮状态
             updateRemoteCommandsState()
         }
     }
@@ -804,7 +809,7 @@ class MediaPlayerHandler: NSObject, FlutterStreamHandler {
         if let currentItem = playlist[safe: currentIndex] {
             eventSink?(["type": "mediaItemChanged", "data": createMediaItemMap(from: currentItem)])
         }
-        // 通知flutter���，当前媒体项时长变化
+        // 通知flutter端，当前媒体项时长变化
         if let duration = playerItem.asset.duration.seconds.isNaN ? nil : playerItem.asset.duration.seconds {
             eventSink?(["type": "durationChanged", "data": Int(duration * 1000)])
         }
@@ -859,6 +864,69 @@ class MediaPlayerHandler: NSObject, FlutterStreamHandler {
         playerLayer?.removeFromSuperlayer()
         playerLayer = nil
     }
+    
+    func updateAt(_ index: Int, mediaItem: [String: Any]) {
+        guard index >= 0 && index < playlist.count else {
+            log("Invalid index for update: \(index)")
+            return
+        }
+        
+        // 更新指定索引的媒体项
+        playlist[index] = mediaItem
+        //如果更新的是当前播放项，则更新当前播放项，并更新当前播放项的时长
+        if index == currentIndex {
+            // 保留当前位置
+            let position = player.currentTime()
+            if let item = playerItems[safe: index] {
+                player.replaceCurrentItem(with: item)
+                // 恢复到之前的位置
+                player.seek(to: position)
+             
+            }
+            
+        }
+
+        // 发送媒体项变化事件
+        eventSink?(["type": "mediaItemChanged", "data": mediaItem])
+
+        // 通知flutter端，当前媒体项变化
+        if let currentItem = playlist[safe: currentIndex] {
+            eventSink?(["type": "mediaItemChanged", "data": createMediaItemMap(from: currentItem)])
+        }
+
+        // 通知flutter端，当前媒体项时长变化
+        if let playerItem = playerItems[safe: index],
+           let duration = playerItem.asset.duration.seconds.isNaN ? nil : playerItem.asset.duration.seconds {
+            eventSink?(["type": "durationChanged", "data": Int(duration * 1000)])
+        }
+
+    }
+    
+    // // 添加安全数组访问扩展
+    // private subscript<T>(safe index: Int) -> T? {
+    //     guard index >= 0, index < count else { return nil }
+    //     return self[index] as? T
+    // }
+    
+    private func log(_ message: String, isError: Bool = false) {
+        if isLoggingEnabled {
+            let event: [String: Any] = [
+                "type": "log",
+                "data": [
+                    "tag": "MediaPlayerHandler",
+                    "message": message,
+                    "isError": isError,
+                    "timestamp": Date().timeIntervalSince1970 * 1000
+                ]
+            ]
+            eventSink?(event)
+        }
+    }
+    
+    func setLoggingEnabled(_ enabled: Bool) {
+        isLoggingEnabled = enabled
+        log("Logging \(enabled ? "enabled" : "disabled")")
+    }
 }
 
 // 添加画中画代理
@@ -885,8 +953,9 @@ extension MediaPlayerHandler: AVPictureInPictureControllerDelegate {
     }
 }
 
+// 添加数组安全访问扩展
 extension Array {
-    subscript(safe index: Index) -> Element? {
+    subscript(safe index: Int) -> Element? {
         return indices.contains(index) ? self[index] : nil
     }
 } 

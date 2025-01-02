@@ -112,7 +112,7 @@ public class MediaPlayerPlugin: NSObject, FlutterPlugin {
                                   details: nil))
                 return
             }
-            mediaPlayer.updateAt(index, mediaItem)
+            mediaPlayer.updateAt(index, mediaItem: mediaItem)
             result(nil)
             
         case "jumpTo":

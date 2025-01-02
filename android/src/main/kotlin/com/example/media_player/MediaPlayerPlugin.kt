@@ -286,12 +286,23 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
                 notifyMediaItemChanged(it)
                 setupNotification(it)
                 notifyPlaylistChanged()
+                // 更新时长
+                player?.duration?.let { duration ->
+                    notifyDurationChanged(duration)
+                }
             }
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
-            val state = if (isPlaying) "playing" else "paused"
-            notifyPlaybackStateChanged(state)
+            if (isPlaying) {
+                startPeriodicPositionUpdates()
+            } else {
+                stopPeriodicPositionUpdates()
+                // 暂停时发送一次最新位置
+                player?.currentPosition?.let { position ->
+                    notifyPositionChanged(position)
+                }
+            }
         }
 
         override fun onTimelineChanged(timeline: Timeline, reason: Int) {
@@ -327,6 +338,7 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
             newPosition: Player.PositionInfo,
             reason: Int
         ) {
+            // 处理跳转等导致的位置突变
             notifyPositionChanged(newPosition.positionMs)
         }
 
@@ -698,6 +710,32 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
         }
     }
 
+    private var periodicPositionUpdateJob: Runnable? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
+    
+    private fun startPeriodicPositionUpdates() {
+        stopPeriodicPositionUpdates() // 先停止现有的更新
+        
+        periodicPositionUpdateJob = object : Runnable {
+            override fun run() {
+                player?.let { player ->
+                    if (player.isPlaying) {
+                        notifyPositionChanged(player.currentPosition)
+                        // 每500ms更新一次
+                        mainHandler.postDelayed(this, 500)
+                    }
+                }
+            }
+        }.also {
+            mainHandler.post(it)
+        }
+    }
+
+    private fun stopPeriodicPositionUpdates() {
+        periodicPositionUpdateJob?.let { mainHandler.removeCallbacks(it) }
+        periodicPositionUpdateJob = null
+    }
+
     override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
         when (call.method) {
             "initialize" -> {
@@ -1036,5 +1074,6 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
         videoViewFactory = null
         serviceJob.cancel()
         flutterEngine = null
+        stopPeriodicPositionUpdates()
     }
 }
