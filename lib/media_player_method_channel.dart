@@ -148,6 +148,13 @@ class MethodChannelMediaPlayer extends MediaPlayerPlatform {
   }
 
   @override
+  Future<void> setPlaybackSpeed(double speed) {
+    return methodChannel.invokeMethod('setSpeed', {
+      'speed': speed,
+    });
+  }
+
+  @override
   Future<void> showVideoView() async {
     await methodChannel.invokeMethod('showVideoView');
   }

@@ -31,6 +31,7 @@ enum MediaPlayerEventType {
   playModeChanged,
   log,
   unknown,
+  speedChanged,
 }
 
 /// 日志事件数据
@@ -116,6 +117,9 @@ class MediaPlayerEventChannel {
             (e) => e.toString().split('.').last == event.data,
             orElse: () => PlayMode.list,
           ));
+
+  /// 获取播放速度变化流
+  Stream<double> get speedStream => eventStream.where((event) => event.type == MediaPlayerEventType.speedChanged).map((event) => event.data as double);
 
   /// 获取日志流
   Stream<LogData> get logStream =>

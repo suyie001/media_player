@@ -195,6 +195,16 @@ abstract class MediaPlayerPlatform extends PlatformInterface {
     throw UnimplementedError('getPlayMode() has not been implemented.');
   }
 
+  /// 设置播放速度
+  Future<void> setPlaybackSpeed(double speed) {
+    throw UnimplementedError('setPlaybackSpeed() has not been implemented.');
+  }
+
+  /// 获取当前播放速度
+  Future<double> speedStream() {
+    throw UnimplementedError('getPlaybackSpeed() has not been implemented.');
+  }
+
   /// 显示视频画面
   Future<void> showVideoView() {
     throw UnimplementedError('showVideoView() has not been implemented.');

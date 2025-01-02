@@ -45,6 +45,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   Duration _duration = Duration.zero;
   List<MediaItem> _playlist = [];
   PlayMode _playMode = PlayMode.list;
+  double _playbackSpeed = 1.0;
 
   bool _isHarmony = false;
   bool _isPureMode = false;
@@ -185,6 +186,14 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       });
     });
 
+    // 监听播放速度变化
+    _player.speedStream.listen((speed) {
+      print('播放速度: $speed');
+      setState(() {
+        _playbackSpeed = speed;
+      });
+    });
+
     await _player.setPlaylist(playlist);
   }
 
@@ -237,7 +246,19 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     print('harmonyVersion: $_harmonyVersion');
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Media Player Demo'),
+        title: Text('Media Player Demo $_playbackSpeed'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.speed),
+            onPressed: () {
+              if (_playbackSpeed == 1.0) {
+                _player.setPlaybackSpeed(2.0);
+              } else {
+                _player.setPlaybackSpeed(1.0);
+              }
+            },
+          ),
+        ],
       ),
       body: SafeArea(
         child: Column(

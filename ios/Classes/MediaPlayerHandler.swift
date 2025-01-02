@@ -777,6 +777,11 @@ class MediaPlayerHandler: NSObject, FlutterStreamHandler {
     func getPlayMode() -> String {
         return playMode.rawValue
     }
+
+    func setSpeed(_ speed: Double) {
+        player.rate = Float(speed)
+        eventSink?(["type": "speedChanged", "data": speed])
+    }
     
     deinit {
         // 移除所有观察者

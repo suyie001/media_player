@@ -743,7 +743,7 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
 
     private fun notifyPlaybackSpeedChanged(speed: Float) {
         val event = mapOf(
-            "type" to "playbackSpeedChanged",
+            "type" to "speedChanged",
             "data" to speed
         )
         activity?.runOnUiThread {

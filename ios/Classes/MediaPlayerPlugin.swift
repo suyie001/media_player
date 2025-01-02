@@ -178,6 +178,19 @@ public class MediaPlayerPlugin: NSObject, FlutterPlugin {
             }
             mediaPlayer.updateCurrentUrl(url)
             result(nil)
+
+        case "setSpeed":
+            guard let args = call.arguments as? [String: Any],
+                  let speed = args["speed"] as? Double else {
+                result(FlutterError(code: "INVALID_ARGUMENT",
+                                  message: "Speed is required",
+                                  details: nil))
+                return
+            }
+            mediaPlayer.setSpeed(speed)
+            result(nil)
+
+        
             
         case "startPictureInPicture":
             mediaPlayer.startPictureInPicture()

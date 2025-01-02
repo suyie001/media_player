@@ -50,6 +50,9 @@ class MediaPlayer {
   /// 获取日志流
   Stream<LogData> get logStream => _eventChannel.logStream;
 
+  /// 获取速度流
+  Stream<double> get speedStream => _eventChannel.speedStream;
+
   /// 初始化播放器
   Future<void> initialize() {
     return MediaPlayerPlatform.instance.initialize();
@@ -148,6 +151,11 @@ class MediaPlayer {
   /// 获取当前播放模式
   Future<PlayMode> getPlayMode() {
     return MediaPlayerPlatform.instance.getPlayMode();
+  }
+
+  /// 设置播放速度
+  Future<void> setPlaybackSpeed(double speed) {
+    return MediaPlayerPlatform.instance.setPlaybackSpeed(speed);
   }
 
   Future<void> showVideoView() async {
