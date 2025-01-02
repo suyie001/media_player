@@ -36,6 +36,7 @@ import kotlinx.coroutines.launch
 import com.google.common.util.concurrent.ListenableFuture
 import io.flutter.embedding.engine.FlutterEngine
 import com.google.common.collect.ImmutableList
+import android.app.PictureInPictureParams
 
 @UnstableApi
 class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
