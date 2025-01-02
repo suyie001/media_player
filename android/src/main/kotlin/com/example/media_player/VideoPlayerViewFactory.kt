@@ -36,7 +36,7 @@ class VideoPlayerViewFactory(
         private val playerView: PlayerView = PlayerView(context).apply {
             this.player = this@VideoPlayerView.player
             visibility = if (enabled) View.VISIBLE else View.GONE
-            useController = true
+            useController = false
             currentView = this
         }
 

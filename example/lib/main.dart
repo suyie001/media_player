@@ -282,15 +282,18 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
             // 当前播放项信息
             if (_currentItem != null) ...[
               if (_isVideoViewVisible)
-                AspectRatio(
-                  aspectRatio: 16 / 9, // 或其他适合的宽高比
-                  child: VideoPlayerView(
-                    onPlatformViewCreated: (id) {
-                      print('Video view created: $id');
-                    },
-                    onDispose: () {
-                      print('Video view disposed');
-                    },
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: AspectRatio(
+                    aspectRatio: 16 / 9, // 或其他适合的宽高比
+                    child: VideoPlayerView(
+                      onPlatformViewCreated: (id) {
+                        print('Video view created: $id');
+                      },
+                      onDispose: () {
+                        print('Video view disposed');
+                      },
+                    ),
                   ),
                 ),
               const SizedBox(height: 20),

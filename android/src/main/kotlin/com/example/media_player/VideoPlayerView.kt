@@ -14,15 +14,31 @@ class VideoPlayerView(
     private val player: Player
 ) : PlatformView {
     private val container = FrameLayout(context)
-    private val playerView: PlayerView = PlayerView(context).apply {
+    private val playerView: PlayerView = PlayerView(
+        // 在创建 PlayerView 时直接应用主题
+        context.apply { 
+            theme.applyStyle(R.style.CustomPlayerViewStyle, true)
+        }
+    ).apply {
         this.player = this@VideoPlayerView.player
-        useController = false  // 禁用默认控制器
-        controllerAutoShow = false  // 禁用控制器自动显示
-        controllerHideOnTouch = true  // 触摸时隐藏控制器
-        setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)  // 从不显示缓冲状态
-        resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT  // 设置视频缩放模式
-        setKeepContentOnPlayerReset(true)  // 保持内容在播放器重置时不消失
-        hideController()  // 确保控制器隐藏
+        
+        // 完全禁用控制器相关设置
+        useController = false
+        controllerAutoShow = false
+        controllerHideOnTouch = false
+        controllerShowTimeoutMs = 0
+        showController()
+        hideController()
+        
+        // 禁用所有控制器相关的交互
+        setUseController(false)
+        setControllerVisibilityListener(PlayerView.ControllerVisibilityListener {})
+        setControllerHideOnTouch(false)
+        
+        // 其他视图设置保持不变
+        setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
+        resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+        setKeepContentOnPlayerReset(true)
     }
 
     init {
