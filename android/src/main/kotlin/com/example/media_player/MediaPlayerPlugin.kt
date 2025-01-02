@@ -218,7 +218,36 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler, Lifec
                 .build()
                 .apply {
                     addListener(playerListener)
-                    addPeriodicTimeUpdateListener()
+                    // 添加位置监听器，每 500ms 更新一次
+                    addAnalyticsListener(object : AnalyticsListener {
+                        override fun onPositionDiscontinuity(
+                            eventTime: AnalyticsListener.EventTime,
+                            oldPosition: Player.PositionInfo,
+                            newPosition: Player.PositionInfo,
+                            reason: Int
+                        ) {
+                            notifyPositionChanged(newPosition.positionMs)
+                        }
+
+                        override fun onPlaybackStateChanged(
+                            eventTime: AnalyticsListener.EventTime,
+                            state: Int
+                        ) {
+                            if (state == Player.STATE_READY && player?.isPlaying == true) {
+                                notifyPositionChanged(eventTime.currentPlaybackPositionMs)
+                            }
+                        }
+
+                        override fun onPlayWhenReadyChanged(
+                            eventTime: AnalyticsListener.EventTime,
+                            playWhenReady: Boolean,
+                            reason: Int
+                        ) {
+                            if (playWhenReady && player?.isPlaying == true) {
+                                notifyPositionChanged(eventTime.currentPlaybackPositionMs)
+                            }
+                        }
+                    })
                 }
 
             mediaSession = player?.let { 
@@ -235,45 +264,6 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler, Lifec
             log("MediaPlayerPlugin", "Failed to initialize player: ${e.message}", true)
             throw e
         }
-    }
-
-    private fun Player.addPeriodicTimeUpdateListener() {
-        val handler = Handler(Looper.getMainLooper())
-        val updateIntervalMs = 1000L // 每秒更新一次
-        
-        val updateRunnable = object : Runnable {
-            override fun run() {
-                if (isPlaying) {
-                    notifyPositionChanged(currentPosition)
-                }
-                handler.postDelayed(this, updateIntervalMs)
-            }
-        }
-        
-        addListener(object : Player.Listener {
-            override fun onIsPlayingChanged(isPlaying: Boolean) {
-                if (isPlaying) {
-                    handler.post(updateRunnable)
-                } else {
-                    handler.removeCallbacks(updateRunnable)
-                    // 暂停时也发送一次位置更新
-                    notifyPositionChanged(currentPosition)
-                }
-            }
-            
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                when (playbackState) {
-                    Player.STATE_ENDED -> {
-                        handler.removeCallbacks(updateRunnable)
-                        notifyPositionChanged(duration)
-                    }
-                    Player.STATE_IDLE -> {
-                        handler.removeCallbacks(updateRunnable)
-                        notifyPositionChanged(0)
-                    }
-                }
-            }
-        })
     }
 
     private var eventSink: EventChannel.EventSink? = null
@@ -312,11 +302,10 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler, Lifec
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
-            if (isPlaying) {
-                startPeriodicPositionUpdates()
-            } else {
-                stopPeriodicPositionUpdates()
-                // 暂停时发送一次最新位置
+            val state = if (isPlaying) "playing" else "paused"
+            notifyPlaybackStateChanged(state)
+            // 暂停时发送一次最新位置
+            if (!isPlaying) {
                 player?.currentPosition?.let { position ->
                     notifyPositionChanged(position)
                 }
@@ -730,32 +719,6 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler, Lifec
                 eventSink?.success(event)
             }
         }
-    }
-
-    private var periodicPositionUpdateJob: Runnable? = null
-    private val mainHandler = Handler(Looper.getMainLooper())
-    
-    private fun startPeriodicPositionUpdates() {
-        stopPeriodicPositionUpdates() // 先停止现有的更新
-        
-        periodicPositionUpdateJob = object : Runnable {
-            override fun run() {
-                player?.let { player ->
-                    if (player.isPlaying) {
-                        notifyPositionChanged(player.currentPosition)
-                        // 每500ms更新一次
-                        mainHandler.postDelayed(this, 500)
-                    }
-                }
-            }
-        }.also {
-            mainHandler.post(it)
-        }
-    }
-
-    private fun stopPeriodicPositionUpdates() {
-        periodicPositionUpdateJob?.let { mainHandler.removeCallbacks(it) }
-        periodicPositionUpdateJob = null
     }
 
     private fun notifyPlaybackSpeedChanged(speed: Float) {
