@@ -38,9 +38,17 @@ import io.flutter.embedding.engine.FlutterEngine
 import com.google.common.collect.ImmutableList
 import android.app.PictureInPictureParams
 import android.content.pm.PackageManager   
+import android.content.res.Configuration
+import android.util.Rational
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleRegistry
 
 @UnstableApi
-class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
+class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler, LifecycleEventObserver {
     private lateinit var context: Context
     private var activity: Activity? = null
     private lateinit var messenger: BinaryMessenger
@@ -115,6 +123,7 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
 
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
         activity = binding.activity
+        
         // 确保在主线程中初始化和注册视频视图工厂
         Handler(Looper.getMainLooper()).post {
             if (player == null) {
@@ -179,6 +188,7 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
 
     override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
         activity = binding.activity
+        checkPipMode()
     }
 
     override fun onDetachedFromActivity() {
@@ -779,8 +789,16 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
     }
     
     // 监听 PiP 模式变化
-    override fun onConfigurationChanged(newConfig: Configuration) {
-        super.onConfigurationChanged(newConfig)
+    override fun onStateChanged(source: LifecycleOwner, event: Lifecycle.Event) {
+        when (event) {
+            Lifecycle.Event.ON_RESUME -> {
+                checkPipMode()
+            }
+            else -> {}
+        }
+    }
+
+    private fun checkPipMode() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             activity?.let { activity ->
                 val wasInPipMode = isInPipMode
@@ -791,6 +809,7 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
             }
         }
     }
+
     private fun exitPictureInPictureMode() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             activity?.let { activity ->

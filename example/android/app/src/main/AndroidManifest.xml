@@ -1,11 +1,19 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    
+    <!-- 添加PiP feature声明 -->
+    <uses-feature
+        android:name="android.software.picture_in_picture"
+        android:required="false" />
     
     <application
         android:label="media_player_example"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
+        android:supportsPictureInPicture="true"
+        android:resizeableActivity="true"
         android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"
@@ -14,6 +22,7 @@
             android:taskAffinity=""
             android:theme="@style/LaunchTheme"
             android:supportsPictureInPicture="true"
+            android:resizeableActivity="true"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">

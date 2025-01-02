@@ -249,6 +249,22 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         title: Text('Media Player Demo $_playbackSpeed'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.picture_in_picture),
+            onPressed: () async {
+              //获取悬浮窗权限
+              bool isGranted = await _requestPictureInPicturePermission();
+              print('isGranted: $isGranted');
+
+              if (await _player.isPictureInPictureSupported()) {
+                _player.startPictureInPicture();
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('PiP is not supported on this device')),
+                );
+              }
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.speed),
             onPressed: () {
               if (_playbackSpeed == 1.0) {
@@ -539,5 +555,16 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       _harmonyVersion = harmonyVersion;
       _isPureMode = isPureMode;
     });
+  }
+
+  Future<bool> _requestPictureInPicturePermission() async {
+    if (Platform.isIOS) {
+      return true;
+    }
+    PermissionStatus status = await Permission.systemAlertWindow.status;
+    if (status.isDenied) {
+      await Permission.systemAlertWindow.request();
+    }
+    return status.isGranted;
   }
 }
