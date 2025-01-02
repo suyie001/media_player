@@ -220,6 +220,11 @@ abstract class MediaPlayerPlatform extends PlatformInterface {
     throw UnimplementedError('updateCurrentUrl() has not been implemented.');
   }
 
+  /// 是否支持画中画
+  Future<bool> isPictureInPictureSupported() {
+    throw UnimplementedError('supportsPictureInPicture() has not been implemented.');
+  }
+
   /// 开始画中画
   Future<void> startPictureInPicture() {
     throw UnimplementedError('startPictureInPicture() has not been implemented.');

@@ -172,6 +172,11 @@ class MethodChannelMediaPlayer extends MediaPlayerPlatform {
   }
 
   @override
+  Future<bool> isPictureInPictureSupported() async {
+    return await methodChannel.invokeMethod('isPictureInPictureSupported');
+  }
+
+  @override
   Future<void> startPictureInPicture() async {
     await methodChannel.invokeMethod('startPictureInPicture');
   }

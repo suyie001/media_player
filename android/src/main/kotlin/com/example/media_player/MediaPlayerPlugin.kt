@@ -55,6 +55,8 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
     private var screenReceiver: BroadcastReceiver? = null
     private var isLoggingEnabled = false
 
+    private var supportsPip = false
+
     // 播放模式枚举
     enum class PlayMode {
         ALL,    // 列表循环
@@ -104,6 +106,9 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
                 eventSink = null
             }
         })
+         supportsPip = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            activity?.packageManager?.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE) == true
+        } else false
     }
 
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
@@ -750,6 +755,18 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
             eventSink?.success(event)
         }
     }
+     // 添加 PiP 模式变化监听
+    private val pipModeChangeCallback = object : PictureInPictureParams.Builder.OnPictureInPictureModeChangedListener {
+        override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean) {
+            val event = mapOf(
+                "type" to "pipModeChanged",
+                "data" to isInPictureInPictureMode
+            )
+            activity?.runOnUiThread {
+                eventSink?.success(event)
+            }
+        }
+    }
 
     override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
         when (call.method) {
@@ -1090,6 +1107,25 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
                 } catch (e: Exception) {
                     result.error("LOGGING_ERROR", e.message, null)
                 }
+            }
+           "isPictureInPictureSupported" -> {
+                result.success(supportsPip)
+            }
+            "startPictureInPicture" -> {
+                 try {
+                    if (supportsPip) {
+                        enterPictureInPictureMode()
+                        result.success(true)
+                    } else {
+                        result.success(false)
+                    }
+                } catch (e: Exception) {
+                    result.error("PIP_ERROR", e.message, null)
+                }
+            }
+            "stopPictureInPicture" -> {
+                stopPictureInPicture()
+                result.success(null)
             }
             else -> result.notImplemented()
         }

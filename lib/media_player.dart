@@ -171,6 +171,10 @@ class MediaPlayer {
     return MediaPlayerPlatform.instance.updateCurrentUrl(url);
   }
 
+  Future<bool> isPictureInPictureSupported() {
+    return MediaPlayerPlatform.instance.isPictureInPictureSupported();
+  }
+
   Future<void> startPictureInPicture() async {
     await MediaPlayerPlatform.instance.startPictureInPicture();
   }
