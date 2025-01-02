@@ -344,7 +344,11 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
         }
 
         override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
-            // 可以在这里添加播放速度变化的通知，如果需要的话
+            // 添加播放速度变化的通知，
+            notifyPlaybackSpeedChanged(playbackParameters.speed)
+            // notifyPlaybackStateChanged("playing")
+            // player?.currentMediaItem?.let { setupNotification(it) }
+
         }
 
         override fun onLoadingChanged(isLoading: Boolean) {
@@ -820,11 +824,31 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
                 player?.let { exoPlayer ->
                     exoPlayer.play()
                     exoPlayer.currentMediaItem?.let { setupNotification(it) }
+                    // 手动触发播放状态变化通知
+                    notifyPlaybackStateChanged("playing")
+                    val event = mapOf(
+                        "type" to "isPlayingChanged",
+                        "data" to true
+                    )
+                    activity?.runOnUiThread {
+                        eventSink?.success(event)
+                    }
                 }
                 result.success(null)
             }
             "pause" -> {
-                player?.pause()
+                player?.let { exoPlayer ->
+                    exoPlayer.pause()
+                    // 手动触发暂停状态变化通知
+                    notifyPlaybackStateChanged("paused")
+                    val event = mapOf(
+                        "type" to "isPlayingChanged",
+                        "data" to false
+                    )
+                    activity?.runOnUiThread {
+                        eventSink?.success(event)
+                    }
+                }
                 result.success(null)
             }
             "stop" -> {
