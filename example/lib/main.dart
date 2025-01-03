@@ -195,6 +195,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     });
 
     await _player.setPlaylist(playlist);
+    _player.jumpTo(2);
+    _player.seekTo(Duration(seconds: 10));
+    _player.pause();
   }
 
   Future<void> checkoutToAudio() async {
@@ -419,7 +422,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                     trailing: const Icon(Icons.drag_handle),
                     onTap: () async {
                       await _player.jumpTo(index);
-                      await _player.play();
+                      //await _player.play();
                     },
                     // onLongPress: () {
                     //   showDialog(

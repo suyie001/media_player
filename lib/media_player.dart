@@ -1,6 +1,7 @@
 import 'media_player_platform_interface.dart';
 import 'media_player_event_channel.dart';
 
+export 'media_player_event_channel.dart';
 export 'media_player_platform_interface.dart';
 export 'video_player_view.dart';
 
