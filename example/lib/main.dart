@@ -138,6 +138,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
     // 监听播放位置变化
     _player.positionStream.listen((position) {
+      if (position.inSeconds == 100) {
+        _player.pause();
+      }
       setState(() => _position = position);
     });
 
