@@ -66,6 +66,7 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler, Lifec
 
     private var supportsPip = false
     private var isInPipMode = false
+    private var isPlaying = false
 
     // 播放模式枚举
     enum class PlayMode {
@@ -303,13 +304,21 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler, Lifec
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             val state = if (isPlaying) "playing" else "paused"
-            notifyPlaybackStateChanged(state)
-            // 暂停时发送一次最新位置
-            if (!isPlaying) {
-                player?.currentPosition?.let { position ->
-                    notifyPositionChanged(position)
+            
+             
+            // 当isPlaying与state不一致时，发送播放状态变化
+            if (isPlaying != this.isPlaying) {
+                this.isPlaying = isPlaying
+                notifyPlaybackStateChanged(state)
+                 // 暂停时发送一次最新位置
+                if (!isPlaying) {
+                    player?.currentPosition?.let { position ->
+                        notifyPositionChanged(position)
+                    }
                 }
             }
+
+           
         }
 
         override fun onTimelineChanged(timeline: Timeline, reason: Int) {
