@@ -816,8 +816,8 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler, Lifec
                 player?.let { player ->
                     if (player.isPlaying) {
                         notifyPositionChanged(player.currentPosition)
-                        // 每200ms更新一次位置
-                        mainHandler.postDelayed(this, 200)
+                        // 每500ms更新一次位置
+                        mainHandler.postDelayed(this, 500)
                     }
                 }
             }
