@@ -605,8 +605,8 @@ class MediaPlayerHandler: NSObject, FlutterStreamHandler {
             if let previousIndex = playHistory.popLast() {
                 currentIndex = previousIndex
             } else {
-                // 如果没有历史记录，则保持当前索引
-                return
+                // 如果没有历史记录，则使用上一首
+                currentIndex -= 1
             }
             
         case .all, .list, .one:
