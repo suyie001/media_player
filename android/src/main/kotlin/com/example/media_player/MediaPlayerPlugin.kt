@@ -99,6 +99,7 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler, Lifec
 
     private val lastEventTimes = mutableMapOf<String, Long>()
     private val DEBOUNCE_INTERVAL = 300L // 防抖时间间隔（毫秒）
+    private var lastPlaybackState = "none"
 
     private fun shouldDebounce(eventType: String): Boolean {
         val lastTime = lastEventTimes[eventType] ?: 0L
@@ -111,14 +112,16 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler, Lifec
     }
 
     private fun notifyEvent(type: String, data: Any?) {
-        if (shouldDebounce(type)) {
-            return
-        }
+        // if (shouldDebounce(type) && type != "playbackStateChanged") {
+        //     log("MediaPlayerPlugin", "Debouncing event: $type,DateTime: ${System.currentTimeMillis()}")
+        //     return
+        // }
         val event = mapOf(
             "type" to type,
             "data" to data
         )
         activity?.runOnUiThread {
+            log("MediaPlayerPlugin", "Notifying event: $event,DateTime: ${System.currentTimeMillis()}")
             eventSink?.success(event)
         }
     }
@@ -379,7 +382,12 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler, Lifec
                 }
                 else -> "unknown"
             }
+             // 只在状态真正改变时通知
+        if (lastPlaybackState != state) {
+            lastPlaybackState = state
             notifyPlaybackStateChanged(state)
+        }
+           // notifyPlaybackStateChanged(state)
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
@@ -767,8 +775,8 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler, Lifec
                 player?.let { player ->
                     if (player.isPlaying) {
                         notifyPositionChanged(player.currentPosition)
-                        // 每500ms更新一次位置
-                        mainHandler.postDelayed(this, 500)
+                        // 每300ms更新一次位置
+                        mainHandler.postDelayed(this, 300)
                     }
                 }
             }
@@ -1166,6 +1174,7 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler, Lifec
         player = null
         mediaSession = null
         videoViewFactory = null
+        lastPlaybackState = "none"
         serviceJob.cancel()
         flutterEngine = null
     }

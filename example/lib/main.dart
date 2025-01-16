@@ -56,7 +56,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     super.initState();
     // 监听应用生命周期
     WidgetsBinding.instance.addObserver(this);
-    _checkHarmony();
+    //  _checkHarmony();
     _requestNotificationPermission();
     _initializePlayer();
   }
@@ -125,7 +125,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     ];
 
     // 监听播放状态变化
-    _player.playbackStateStream.listen((state) {
+    _player.playbackStateStream.distinct((PlaybackState previous, PlaybackState next) {
+      // 确保两个事件都是Map类型
+      return previous == next;
+    }).listen((state) {
       print('播放状态: ${state.name}');
       setState(() => _playbackState = state);
     });
@@ -137,10 +140,19 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     });
 
     // 监听播放位置变化
-    _player.positionStream.listen((position) {
-      if (position.inSeconds >= 100) {
-        _player.pause();
-      }
+    _player.positionStream
+        // .distinct((previous, next) {
+        //   // 确保两个事件都是Map类型
+        //   if (previous is! Map || next is! Map) return false;
+
+        //   return previous == next;
+        // })
+
+        .listen((position) {
+      // if (position.inSeconds >= 100) {
+      //   _player.pause();
+      // }
+      print('position: $position');
       setState(() => _position = position);
     });
 
@@ -200,7 +212,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     await _player.setPlaylist(playlist);
     _player.jumpTo(2);
     _player.seekTo(Duration(seconds: 10));
-    _player.pause();
+    // _player.pause();
+    _player.play();
   }
 
   Future<void> checkoutToAudio() async {
@@ -247,9 +260,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         playModeIcon = Icons.shuffle;
         break;
     }
-    print('isHarmony: $_isHarmony');
-    print('isPureMode: $_isPureMode');
-    print('harmonyVersion: $_harmonyVersion');
+    // print('isHarmony: $_isHarmony');
+    // print('isPureMode: $_isPureMode');
+    // print('harmonyVersion: $_harmonyVersion');
     return Scaffold(
       appBar: AppBar(
         title: Text('Media Player Demo $_playbackSpeed'),

@@ -32,6 +32,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   permission_handler: ^11.3.0
   harmony_plugin: ^0.1.0
+  rxdart: ^0.28.0
 
 dev_dependencies:
   integration_test:

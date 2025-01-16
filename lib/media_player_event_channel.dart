@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+
 import 'media_player_platform_interface.dart';
 
 /// 媒体播放器事件
@@ -66,8 +67,30 @@ class MediaPlayerEventChannel {
 
   /// 获取事件流
   Stream<MediaPlayerEvent> get eventStream {
-    _eventStream ??= _eventChannel.receiveBroadcastStream().map((event) {
-      print('event: $event');
+    _eventStream ??= _eventChannel
+        .receiveBroadcastStream()
+        // .distinct((previous, next) {
+        //   // 确保两个事件都是Map类型
+        //   if (previous is! Map || next is! Map) return false;
+
+        //   Map<String, dynamic> previousMap = Map<String, dynamic>.from(previous);
+        //   Map<String, dynamic> nextMap = Map<String, dynamic>.from(next);
+
+        //   // 如果type不同，则认为是不同的事件
+        //   if (previousMap['type'] != nextMap['type']) return false;
+
+        //   // type相同时，比较data是否相同
+        //   return previousMap['data'] == nextMap['data'];
+        // })
+        // .listen((event) {
+        //   print('event: $event');
+
+        // })
+        // .throttleTime(const Duration(milliseconds: 300))
+
+        // 转换事件
+        .map((event) {
+      // print('event: $event');
       if (event is! Map) return MediaPlayerEvent(MediaPlayerEventType.unknown, null);
       return MediaPlayerEvent.fromMap(Map<String, dynamic>.from(event));
     });
