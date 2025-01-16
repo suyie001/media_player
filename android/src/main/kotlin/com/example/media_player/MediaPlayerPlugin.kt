@@ -97,6 +97,98 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler, Lifec
         }
     }
 
+    private val lastEventTimes = mutableMapOf<String, Long>()
+    private val DEBOUNCE_INTERVAL = 300L // 防抖时间间隔（毫秒）
+
+    private fun shouldDebounce(eventType: String): Boolean {
+        val lastTime = lastEventTimes[eventType] ?: 0L
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastTime < DEBOUNCE_INTERVAL) {
+            return true
+        }
+        lastEventTimes[eventType] = currentTime
+        return false
+    }
+
+    private fun notifyEvent(type: String, data: Any?) {
+        if (shouldDebounce(type)) {
+            return
+        }
+        val event = mapOf(
+            "type" to type,
+            "data" to data
+        )
+        activity?.runOnUiThread {
+            eventSink?.success(event)
+        }
+    }
+
+    private fun notifyPlaybackStateChanged(state: String) {
+        notifyEvent("playbackStateChanged", state)
+    }
+
+    private fun notifyPositionChanged(position: Long) {
+        notifyEvent("positionChanged", position)
+    }
+
+    private fun notifyDurationChanged(duration: Long) {
+        notifyEvent("durationChanged", duration)
+    }
+
+    private fun notifyPlaybackSpeedChanged(speed: Float) {
+        notifyEvent("speedChanged", speed)
+    }
+
+    private fun notifyBufferingChanged(isBuffering: Boolean) {
+        notifyEvent("bufferingChanged", isBuffering)
+    }
+
+    private fun notifyMediaItemChanged(mediaItem: MediaItem) {
+        notifyEvent("mediaItemChanged", mapOf(
+            "id" to mediaItem.mediaId,
+            "title" to mediaItem.mediaMetadata.title?.toString(),
+            "artist" to mediaItem.mediaMetadata.artist?.toString(),
+            "album" to mediaItem.mediaMetadata.displayTitle?.toString(),
+            "artworkUrl" to mediaItem.mediaMetadata.artworkUri?.toString(),
+            "url" to mediaItem.localConfiguration?.uri?.toString()
+        ))
+    }
+
+    private fun notifyPlaylistChanged() {
+        val currentItems = mutableListOf<Map<String, Any?>>()
+        player?.let { exoPlayer ->
+            for (i in 0 until exoPlayer.mediaItemCount) {
+                exoPlayer.getMediaItemAt(i)?.let { mediaItem ->
+                    currentItems.add(mapOf(
+                        "id" to mediaItem.mediaId,
+                        "title" to mediaItem.mediaMetadata.title?.toString(),
+                        "artist" to mediaItem.mediaMetadata.artist?.toString(),
+                        "album" to mediaItem.mediaMetadata.displayTitle?.toString(),
+                        "artworkUrl" to mediaItem.mediaMetadata.artworkUri?.toString(),
+                        "url" to mediaItem.localConfiguration?.uri?.toString()
+                    ))
+                }
+            }
+        }
+        notifyEvent("playlistChanged", currentItems)
+    }
+
+    private fun notifyPlaybackModeChanged(mode: String) {
+        notifyEvent("playModeChanged", mode)
+    }
+
+    private fun notifyCompleted() {
+        notifyEvent("completed", true)
+    }
+
+    private fun notifyError(error: String) {
+        notifyEvent("errorOccurred", error)
+    }
+
+    private fun notifyBufferChanged(progress: Double) {
+        notifyEvent("bufferChanged", progress)
+    }
+
     override fun onAttachedToEngine(@NonNull binding: FlutterPlugin.FlutterPluginBinding) {
         context = binding.applicationContext
         messenger = binding.binaryMessenger
@@ -425,33 +517,6 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler, Lifec
         }
     }
 
-    private fun notifyPlaybackStateChanged(state: String) {
-        val event = mapOf(
-            "type" to "playbackStateChanged",
-            "data" to state
-        )
-        activity?.runOnUiThread {
-            eventSink?.success(event)
-        }
-    }
-
-    private fun notifyMediaItemChanged(mediaItem: MediaItem) {
-        val event = mapOf(
-            "type" to "mediaItemChanged",
-            "data" to mapOf(
-                "id" to mediaItem.mediaId,
-                "title" to mediaItem.mediaMetadata.title?.toString(),
-                "artist" to mediaItem.mediaMetadata.artist?.toString(),
-                "album" to mediaItem.mediaMetadata.displayTitle?.toString(),
-                "artworkUrl" to mediaItem.mediaMetadata.artworkUri?.toString(),
-                "url" to mediaItem.localConfiguration?.uri?.toString()
-            )
-        )
-        activity?.runOnUiThread {
-            eventSink?.success(event)
-        }
-    }
-
     private fun addToPlaylist(mediaItems: List<Map<String, Any>>) {
         val items = mediaItems.mapNotNull { item ->
             try {
@@ -508,117 +573,6 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler, Lifec
 
     private fun getCurrentIndex(): Int {
         return player?.currentMediaItemIndex ?: 0
-    }
-
-    private fun notifyPlaylistChanged() {
-        val currentItems = mutableListOf<Map<String, Any?>>()
-        player?.let { exoPlayer ->
-            for (i in 0 until exoPlayer.mediaItemCount) {
-                exoPlayer.getMediaItemAt(i)?.let { mediaItem ->
-                    currentItems.add(mapOf(
-                        "id" to mediaItem.mediaId,
-                        "title" to mediaItem.mediaMetadata.title?.toString(),
-                        "artist" to mediaItem.mediaMetadata.artist?.toString(),
-                        "album" to mediaItem.mediaMetadata.displayTitle?.toString(),
-                        "artworkUrl" to mediaItem.mediaMetadata.artworkUri?.toString(),
-                        "url" to mediaItem.localConfiguration?.uri?.toString()
-                    ))
-                }
-            }
-        }
-        
-        val event = mapOf(
-            "type" to "playlistChanged",
-            "data" to currentItems
-        )
-        activity?.runOnUiThread {
-            eventSink?.success(event)
-        }
-    }
-
-    private fun notifyPositionChanged(position: Long) {
-        val event = mapOf(
-            "type" to "positionChanged",
-            "data" to position
-        )
-        activity?.runOnUiThread {
-            eventSink?.success(event)
-        }
-    }
-
-    private fun notifyDurationChanged(duration: Long) {
-        val event = mapOf(
-            "type" to "durationChanged",
-            "data" to duration
-        )
-        activity?.runOnUiThread {
-            eventSink?.success(event)
-        }
-    }
-
-    private fun notifyBufferChanged(progress: Double) {
-        val event = mapOf(
-            "type" to "bufferChanged",
-            "data" to progress
-        )
-        activity?.runOnUiThread {
-            eventSink?.success(event)
-        }
-    }
-
-    private fun notifyBufferingChanged(isBuffering: Boolean) {
-        val event = mapOf(
-            "type" to "bufferingChanged",
-            "data" to isBuffering
-        )
-        activity?.runOnUiThread {
-            eventSink?.success(event)
-        }
-    }
-
-    private fun notifyPlaybackModeChanged(mode: String) {
-        val event = mapOf(
-            "type" to "playModeChanged",
-            "data" to mode
-        )
-        activity?.runOnUiThread {
-            eventSink?.success(event)
-        }
-    }
-
-    private fun notifyError(error: String) {
-        val event = mapOf(
-            "type" to "errorOccurred",
-            "data" to error
-        )
-        activity?.runOnUiThread {
-            eventSink?.success(event)
-        }
-    }
-
-    private fun notifyCompleted() {
-        val event = mapOf(
-            "type" to "completed",
-            "data" to true
-        )
-        activity?.runOnUiThread {
-            eventSink?.success(event)
-        }
-    }
-
-    private fun startPlaybackService() {
-        if (!isServiceBound) {
-            val intent = Intent(context, PlaybackService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.bindService(
-                    intent,
-                    serviceConnection,
-                    Context.BIND_AUTO_CREATE or Context.BIND_IMPORTANT
-                )
-            } else {
-                context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
-            }
-        }
     }
 
     private fun setupNotification(mediaItem: MediaItem) {
@@ -736,16 +690,7 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler, Lifec
         }
     }
 
-    private fun notifyPlaybackSpeedChanged(speed: Float) {
-        val event = mapOf(
-            "type" to "speedChanged",
-            "data" to speed
-        )
-        activity?.runOnUiThread {
-            eventSink?.success(event)
-        }
-    }
-   // 添加进入 PiP 模式的方法
+    // 添加进入 PiP 模式的方法
     private fun enterPictureInPictureMode() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             activity?.let { activity ->
