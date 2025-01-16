@@ -46,7 +46,13 @@ class NotificationManager(
             ).apply {
                 description = "Media playback controls"
                 setShowBadge(false)
-                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+                // 明确设置锁屏可见性
+                lockscreenVisibility = NotificationManager.IMPORTANCE_HIGH
+                // 允许在锁屏上显示媒体控制
+                setAllowBubbles(true)
+                setSound(null, null)
+                enableLights(false)
+                enableVibration(false)
             }
 
             notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -90,16 +96,28 @@ class NotificationManager(
                             ) {
                                 // 通知显示时的处理
                                 Log.d("NotificationManager", "Notification posted successfully")
+//                                if (ongoing) {
+//                                    // 使用 FLAG_ONGOING_EVENT 确保通知持续显示
+//                                    notification.flags = notification.flags or Notification.FLAG_ONGOING_EVENT
+//                                    notification.flags = notification.flags or Notification.FLAG_NO_CLEAR
+//                                    startForeground(notificationId, notification)
+//                                }
                             }
                         }
                     )
                     .build()
                     .apply {
                         setMediaSessionToken(mediaSession.sessionCompatToken)
+
                         setUseNextActionInCompactView(true)
                         setUsePreviousActionInCompactView(true)
                         setUsePlayPauseActions(true)
+
+//                        setOngoing(true)// 确保通知持续显示
+
                         setUseStopAction(false)
+                        setUseRewindAction(false)  // 禁用快退
+                        setUseFastForwardAction(false)  // 禁用快进
                         setPlayer(player)
                     }
             } catch (e: Exception) {
