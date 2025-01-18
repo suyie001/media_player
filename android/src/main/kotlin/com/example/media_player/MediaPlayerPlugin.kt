@@ -48,7 +48,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleRegistry
 
 @UnstableApi
-class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler, LifecycleEventObserver {
+class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
     private lateinit var context: Context
     private var activity: Activity? = null
     private lateinit var messenger: BinaryMessenger
@@ -689,41 +689,6 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler, Lifec
             activity?.runOnUiThread {
                 eventSink?.success(event)
             }
-        }
-    }
-
-    private fun checkPipMode() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            activity?.let { activity ->
-                val wasInPipMode = isInPipMode
-                isInPipMode = activity.isInPictureInPictureMode
-                if (wasInPipMode != isInPipMode) {
-                    notifyPipModeChanged(isInPipMode)
-                }
-            }
-        }
-    }
-
-    private fun exitPictureInPictureMode() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            activity?.let { activity ->
-                if (activity.isInPictureInPictureMode) {
-                    // 将应用移回前台
-                    val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-                    intent?.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
-                    activity.startActivity(intent)
-                }
-            }
-        }
-    }
-    
-    private fun notifyPipModeChanged(isInPipMode: Boolean) {
-        val event = mapOf(
-            "type" to "pipModeChanged",
-            "data" to isInPipMode
-        )
-        activity?.runOnUiThread {
-            eventSink?.success(event)
         }
     }
 
