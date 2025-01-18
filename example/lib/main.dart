@@ -3,7 +3,6 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:harmony_plugin/harmony_plugin.dart';
 import 'package:media_player/media_player.dart';
 import 'package:permission_handler/permission_handler.dart';
 // import 'package:media_player/media_player_platform_interface.dart';
@@ -47,10 +46,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   PlayMode _playMode = PlayMode.list;
   double _playbackSpeed = 1.0;
 
-  bool _isHarmony = false;
-  bool _isPureMode = false;
-  String _harmonyVersion = '';
-  final _harmonyPlugin = HarmonyPlugin();
   @override
   void initState() {
     super.initState();
@@ -260,9 +255,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         playModeIcon = Icons.shuffle;
         break;
     }
-    // print('isHarmony: $_isHarmony');
-    // print('isPureMode: $_isPureMode');
-    // print('harmonyVersion: $_harmonyVersion');
+
     return Scaffold(
       appBar: AppBar(
         title: Text('Media Player Demo $_playbackSpeed'),
@@ -273,13 +266,16 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
               //获取悬浮窗权限
               bool isGranted = await _requestPictureInPicturePermission();
               print('isGranted: $isGranted');
-
-              if (await _player.isPictureInPictureSupported()) {
+              if (Platform.isIOS) {
                 _player.startPictureInPicture();
               } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('PiP is not supported on this device')),
-                );
+                if (await _player.isPictureInPictureSupported()) {
+                  _player.startPictureInPicture();
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('PiP is not supported on this device')),
+                  );
+                }
               }
             },
           ),
@@ -546,37 +542,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         ),
       );
     }
-  }
-
-  Future<void> _checkHarmony() async {
-    if (Platform.isIOS) {
-      return;
-    }
-    bool isHarmony;
-    bool isPureMode;
-    String harmonyVersion;
-    // Platform messages may fail, so we use a try/catch PlatformException.
-    // We also handle the message potentially returning null.
-    try {
-      isHarmony = await _harmonyPlugin.isHarmonyOS();
-      harmonyVersion = await _harmonyPlugin.getHarmonyVersion();
-      isPureMode = await _harmonyPlugin.isHarmonyPureMode();
-    } on PlatformException {
-      isHarmony = false;
-      harmonyVersion = '';
-      isPureMode = false;
-    }
-
-    // If the widget was removed from the tree while the asynchronous platform
-    // message was in flight, we want to discard the reply rather than calling
-    // setState to update our non-existent appearance.
-    if (!mounted) return;
-
-    setState(() {
-      _isHarmony = isHarmony;
-      _harmonyVersion = harmonyVersion;
-      _isPureMode = isPureMode;
-    });
   }
 
   Future<bool> _requestPictureInPicturePermission() async {

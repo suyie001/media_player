@@ -98,7 +98,7 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler, Lifec
     }
 
     private val lastEventTimes = mutableMapOf<String, Long>()
-    private val DEBOUNCE_INTERVAL = 300L // 防抖时间间隔（毫秒）
+    private val DEBOUNCE_INTERVAL = 200L // 防抖时间间隔（毫秒）
     private var lastPlaybackState = "none"
 
     private fun shouldDebounce(eventType: String): Boolean {
@@ -775,8 +775,8 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler, Lifec
                 player?.let { player ->
                     if (player.isPlaying) {
                         notifyPositionChanged(player.currentPosition)
-                        // 每300ms更新一次位置
-                        mainHandler.postDelayed(this, 300)
+                        // 每200ms更新一次位置
+                        mainHandler.postDelayed(this, 200)
                     }
                 }
             }

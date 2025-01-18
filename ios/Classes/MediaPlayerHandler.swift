@@ -213,7 +213,7 @@ class MediaPlayerHandler: NSObject, FlutterStreamHandler {
         
         // 监听播放位置
         player.addPeriodicTimeObserver(
-            forInterval: CMTime(seconds: 1, preferredTimescale: 1),
+            forInterval: CMTime(seconds: 0.2, preferredTimescale: 1000),
             queue: .main
         ) { [weak self] time in
             guard let self = self else { return }
@@ -431,6 +431,8 @@ class MediaPlayerHandler: NSObject, FlutterStreamHandler {
     }
     
     func setPlaylist(_ items: [[String: Any]]) {
+        let isPlaying = player.timeControlStatus == .playing
+        player.pause()
         artworkCache.removeAll()
         
         playlist = items
@@ -456,6 +458,10 @@ class MediaPlayerHandler: NSObject, FlutterStreamHandler {
         player.replaceCurrentItem(with: playerItems[currentIndex])
         // 确保从头开始播放
         player.seek(to: .zero)
+        // 恢复播放状态
+        if isPlaying {
+            player.play()
+        }
         updateNowPlayingInfo()
         
         // 发送播放列表变化事件
@@ -531,7 +537,14 @@ class MediaPlayerHandler: NSObject, FlutterStreamHandler {
     
     func seekTo(position: TimeInterval) {
         let time = CMTime(seconds: position, preferredTimescale: 1000)
+        // 先临时变量保存当前isPlaying状态  
+        let isPlaying = player.timeControlStatus == .playing
+        player.pause()
         player.seek(to: time)
+        // 恢复播放状态
+        if isPlaying {
+            player.play()
+        }
     }
     
     private func updateRemoteCommandsState() {
@@ -586,6 +599,7 @@ class MediaPlayerHandler: NSObject, FlutterStreamHandler {
             currentIndex += 1
         }
         
+        
         player.replaceCurrentItem(with: playerItems[currentIndex])
         player.seek(to: .zero)
         play()
@@ -606,7 +620,14 @@ class MediaPlayerHandler: NSObject, FlutterStreamHandler {
                 currentIndex = previousIndex
             } else {
                 // 如果没有历史记录，则使用上一首
-                currentIndex -= 1
+                if currentIndex > 0 {
+                    currentIndex -= 1
+                } else {
+                    currentIndex = playerItems.count - 1
+                    // 直接跳出,避免执行 currentIndex -= 1
+                    break
+                
+                }
             }
             
         case .all, .list, .one:

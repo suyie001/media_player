@@ -1,7 +1,5 @@
 PODS:
   - Flutter (1.0.0)
-  - harmony_plugin (0.0.1):
-    - Flutter
   - integration_test (0.0.1):
     - Flutter
   - media_player (0.0.1):
@@ -11,7 +9,6 @@ PODS:
 
 DEPENDENCIES:
   - Flutter (from `Flutter`)
-  - harmony_plugin (from `.symlinks/plugins/harmony_plugin/ios`)
   - integration_test (from `.symlinks/plugins/integration_test/ios`)
   - media_player (from `.symlinks/plugins/media_player/ios`)
   - permission_handler_apple (from `.symlinks/plugins/permission_handler_apple/ios`)
@@ -19,8 +16,6 @@ DEPENDENCIES:
 EXTERNAL SOURCES:
   Flutter:
     :path: Flutter
-  harmony_plugin:
-    :path: ".symlinks/plugins/harmony_plugin/ios"
   integration_test:
     :path: ".symlinks/plugins/integration_test/ios"
   media_player:
@@ -30,7 +25,6 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   Flutter: e0871f40cf51350855a761d2e70bf5af5b9b5de7
-  harmony_plugin: f76f6a78f16dc37e1c9e1dff2bf4e58a787bc7c2
   integration_test: 252f60fa39af5e17c3aa9899d35d908a0721b573
   media_player: 1fa0ce835b4e3da2575156bb1df6741e127c7cc3
   permission_handler_apple: 9878588469a2b0d0fc1e048d9f43605f92e6cec2
