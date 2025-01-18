@@ -63,9 +63,6 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler, Lifec
     private var notificationManager: NotificationManager? = null
     private var screenReceiver: BroadcastReceiver? = null
     private var isLoggingEnabled = false
-
-    private var supportsPip = false
-    private var isInPipMode = false
     private var isPlayingState : Boolean? = null
 
     // 播放模式枚举
@@ -212,9 +209,6 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler, Lifec
                 eventSink = null
             }
         })
-         supportsPip = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            activity?.packageManager?.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE) == true
-        } else false
     }
 
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
@@ -698,37 +692,6 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler, Lifec
         }
     }
 
-    // 添加进入 PiP 模式的方法
-    private fun enterPictureInPictureMode() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            activity?.let { activity ->
-                try {
-                    val params = PictureInPictureParams.Builder()
-                        .setAspectRatio(Rational(16, 9))  // 设置宽高比
-                        .build()
-                    
-                    if (activity.enterPictureInPictureMode(params)) {
-                        isInPipMode = true
-                        notifyPipModeChanged(true)
-                        log("MediaPlayerPlugin", "Entered PiP mode")
-                    }
-                } catch (e: Exception) {
-                    log("MediaPlayerPlugin", "Failed to enter PiP mode: ${e.message}", true)
-                }
-            }
-        }
-    }
-    
-    // 监听 PiP 模式变化
-    override fun onStateChanged(source: LifecycleOwner, event: Lifecycle.Event) {
-        when (event) {
-            Lifecycle.Event.ON_RESUME -> {
-                checkPipMode()
-            }
-            else -> {}
-        }
-    }
-
     private fun checkPipMode() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             activity?.let { activity ->
@@ -1130,32 +1093,14 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler, Lifec
                     result.error("LOGGING_ERROR", e.message, null)
                 }
             }
-           "isPictureInPictureSupported" -> {
-                result.success(supportsPip)
+            "isPictureInPictureSupported" -> {
+                result.success(false)
             }
             "startPictureInPicture" -> {
-                 try {
-                    if (supportsPip) {
-                        enterPictureInPictureMode()
-                        result.success(true)
-                    } else {
-                        result.success(false)
-                    }
-                } catch (e: Exception) {
-                    result.error("PIP_ERROR", e.message, null)
-                }
+                result.success(false)
             }
             "stopPictureInPicture" -> {
-                 try {
-                    if (supportsPip) {
-                        exitPictureInPictureMode()
-                        result.success(true)
-                    } else {
-                        result.success(false)
-                    }
-                } catch (e: Exception) {
-                    result.error("PIP_ERROR", e.message, null)
-                }
+                result.success(false)
             }
             else -> result.notImplemented()
         }
