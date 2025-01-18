@@ -278,7 +278,6 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
 
     override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
         activity = binding.activity
-        checkPipMode()
     }
 
     override fun onDetachedFromActivity() {
