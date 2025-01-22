@@ -58,8 +58,7 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'androidx.media:media:1.6.0'
     
-    // Flutter engine
-    compileOnly 'io.flutter:flutter_embedding_debug:1.0.0-3316dd8728419ad3534e3f6112aa6291f587078a'
+  
     
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.mockito:mockito-core:5.0.0'
