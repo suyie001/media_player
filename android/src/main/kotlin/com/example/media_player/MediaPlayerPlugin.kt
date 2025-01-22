@@ -326,22 +326,31 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
                         }
 
                         override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
-                            if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS) {
-                                // 失去音频焦点时停止位置更新
-                                stopPeriodicPositionUpdates()
-                            } else if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_GAIN) {
-                                // 获得音频焦点时恢复位置更新
+                            if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_REMOTE) {
+                                // 音频焦点变化导致的播放状态改变
                                 if (playWhenReady) {
                                     startPeriodicPositionUpdates()
+                                    // 手动触发一次位置更新
+                                    player?.currentPosition?.let { position ->
+                                        notifyPositionChanged(position)
+                                    }
+                                } else {
+                                    stopPeriodicPositionUpdates()
+                                    // 发送最后一次位置
+                                    player?.currentPosition?.let { position ->
+                                        notifyPositionChanged(position)
+                                    }
                                 }
-                            }
-                            if (playWhenReady) {
-                                startPeriodicPositionUpdates()
                             } else {
-                                stopPeriodicPositionUpdates()
-                                // 暂停时发送最后一次位置
-                                player?.currentPosition?.let { position ->
-                                    notifyPositionChanged(position)
+                                // 其他原因导致的播放状态改变
+                                if (playWhenReady) {
+                                    startPeriodicPositionUpdates()
+                                } else {
+                                    stopPeriodicPositionUpdates()
+                                    // 暂停时发送最后一次位置
+                                    player?.currentPosition?.let { position ->
+                                        notifyPositionChanged(position)
+                                    }
                                 }
                             }
                         }
