@@ -326,6 +326,15 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
                         }
 
                         override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                            if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS) {
+                                // 失去音频焦点时停止位置更新
+                                stopPeriodicPositionUpdates()
+                            } else if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_GAIN) {
+                                // 获得音频焦点时恢复位置更新
+                                if (playWhenReady) {
+                                    startPeriodicPositionUpdates()
+                                }
+                            }
                             if (playWhenReady) {
                                 startPeriodicPositionUpdates()
                             } else {
