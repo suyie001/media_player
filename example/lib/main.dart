@@ -220,7 +220,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
   Future<void> checkoutToVideo() async {
     Duration position = _position;
-    //  await _player.updateCurrentUrl('http://oss-api-audio.zuidie.net/audio/MP4L/7f12cb0dc07148898ef5b949e84b2eb6.mp4');
+    await _player.updateCurrentUrl('http://oss-api-audio.zuidie.net/audio/MP4L/7f12cb0dc07148898ef5b949e84b2eb6.mp4');
     await _player.showVideoView();
     setState(() {
       _isVideoViewVisible = true;

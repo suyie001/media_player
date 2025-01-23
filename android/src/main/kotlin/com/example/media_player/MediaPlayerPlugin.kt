@@ -735,6 +735,59 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
         periodicPositionUpdateJob = null
     }
 
+    private fun updateCurrentUrl(url: String) {
+        try {
+            player?.let { exoPlayer ->
+                // 获取当前媒体项和索引
+                val currentIndex = exoPlayer.currentMediaItemIndex
+                val currentItem = exoPlayer.currentMediaItem
+                
+                if (currentItem != null) {
+                    // 记住当前位置
+                    val currentPosition = exoPlayer.currentPosition
+                    val wasPlaying = exoPlayer.isPlaying
+                    
+                    // 创建新的媒体项，保持原有的元数据，只更新 URL
+                    val newItem = currentItem.buildUpon()
+                        .setUri(url)
+                        .build()
+                    
+                    // 替换当前索引的媒体项
+                    exoPlayer.removeMediaItem(currentIndex)
+                    exoPlayer.addMediaItem(currentIndex, newItem)
+                    
+                    // 确保播放器准备就绪
+                    if (!exoPlayer.isLoading) {
+                        exoPlayer.prepare()
+                    }
+                    
+                    // 恢复到原来的索引和位置
+                    exoPlayer.seekTo(currentIndex, currentPosition)
+                    
+                    // 通知 URL 已更新
+                    notifyEvent("urlUpdated", null)
+                    
+                    // 通知媒体项变化
+                    notifyMediaItemChanged(newItem)
+                    
+                    // 通知时长变化
+                    exoPlayer.duration.let { duration ->
+                        if (duration > 0) {
+                            notifyDurationChanged(duration)
+                        }
+                    }
+                    
+                    // 如果之前在播放，继续播放
+                    if (wasPlaying) {
+                        exoPlayer.play()
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            notifyError("Failed to update URL: ${e.message}")
+        }
+    }
+
     override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
         when (call.method) {
             "initialize" -> {
@@ -1083,6 +1136,19 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
             }
             "stopPictureInPicture" -> {
                 result.success(false)
+            }
+            "updateCurrentUrl" -> {
+                try {
+                    val url = call.argument<String>("url")
+                    if (url != null) {
+                        updateCurrentUrl(url)
+                        result.success(null)
+                    } else {
+                        result.error("INVALID_ARGUMENT", "URL cannot be null", null)
+                    }
+                } catch (e: Exception) {
+                    result.error("URL_UPDATE_ERROR", e.message, null)
+                }
             }
             else -> result.notImplemented()
         }
