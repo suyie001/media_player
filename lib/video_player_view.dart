@@ -58,6 +58,7 @@ class _IOSVideoPlayerState extends State<_IOSVideoPlayer> {
   Widget build(BuildContext context) {
     return UiKitView(
       viewType: 'media_player_video_view',
+      layoutDirection: TextDirection.ltr,
       creationParamsCodec: const StandardMessageCodec(),
       onPlatformViewCreated: widget.onPlatformViewCreated,
     );
