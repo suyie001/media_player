@@ -14,6 +14,11 @@ public class MediaPlayerPlugin: NSObject, FlutterPlugin {
         
         let instance = MediaPlayerPlugin()
         instance.registrar = registrar
+        
+        // 在插件初始化时就创建并注册视图工厂
+        instance.videoViewFactory = MediaPlayerVideoViewFactory(player: instance.mediaPlayer.player)
+        registrar.register(instance.videoViewFactory!, withId: "media_player_video_view")
+        
         registrar.addMethodCallDelegate(instance, channel: channel)
         eventChannel.setStreamHandler(instance)
     }
@@ -21,13 +26,8 @@ public class MediaPlayerPlugin: NSObject, FlutterPlugin {
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         switch call.method {
         case "showVideoView":
-            if videoViewFactory == nil {
-                videoViewFactory = MediaPlayerVideoViewFactory(player: mediaPlayer.player)
-                registrar?.register(videoViewFactory!, withId: "media_player_video_view")
-            }
+            // 只需要处理显示/隐藏逻辑，不需要再注册视图工厂
             result(nil)
-            
-  
             
         case "initialize":
             result(nil)
