@@ -39,6 +39,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   bool _isVideoViewVisible = false;
   final _player = MediaPlayer();
   MediaItem? _currentItem;
+  int _currentIndex = 0;
+
   PlaybackState _playbackState = PlaybackState.none;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
@@ -54,6 +56,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     //  _checkHarmony();
     _requestNotificationPermission();
     _initializePlayer();
+    _requestPictureInPicturePermission();
   }
 
   @override
@@ -61,6 +64,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
     } else if (state == AppLifecycleState.paused) {
       print('应用进入后台');
+
+      if (Platform.isIOS) {
+        _player.startPictureInPicture();
+      }
     }
   }
 
@@ -131,7 +138,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     // 监听当前媒体项变化
     _player.mediaItemStream.listen((item) {
       print('当前媒体项: ${item?.title},id: ${item?.id} ${item?.url}');
-      setState(() => _currentItem = item);
+      setState(() {
+        _currentItem = item;
+        _currentIndex = _playlist.indexWhere((element) => element.id == item?.id);
+      });
     });
 
     // 监听播放位置变化
@@ -219,12 +229,16 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   }
 
   Future<void> checkoutToVideo() async {
-    Duration position = _position;
-    await _player.updateCurrentUrl('http://oss-api-audio.zuidie.net/audio/MP4L/7f12cb0dc07148898ef5b949e84b2eb6.mp4');
-    await _player.showVideoView();
     setState(() {
       _isVideoViewVisible = true;
     });
+    Duration position = _position;
+    await _player.updateCurrentUrl('http://oss-api-audio.zuidie.net/audio/MP4L/7f12cb0dc07148898ef5b949e84b2eb6.mp4');
+    await _player.showVideoView();
+    // _player.startPictureInPicture();
+    // setState(() {
+    //   _isVideoViewVisible = true;
+    // });
     await Future.delayed(const Duration(seconds: 1));
     print('seekTo: $position');
     await _player.seekTo(position);
@@ -260,6 +274,24 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       appBar: AppBar(
         title: Text('Media Player Demo $_playbackSpeed'),
         actions: [
+          IconButton(
+            onPressed: () async {
+              int tempIndex = _currentIndex;
+              print('tempIndex: $tempIndex');
+              Duration tempPosition = _position;
+              bool autoPlay = _playbackState == PlaybackState.playing;
+              await _player.setPlaylist(_playlist);
+              await Future.delayed(const Duration(milliseconds: 240));
+              await _player.jumpTo(tempIndex);
+              await _player.seekTo(tempPosition);
+              if (autoPlay) {
+                await _player.play();
+              } else {
+                _player.pause();
+              }
+            },
+            icon: const Icon(Icons.list),
+          ),
           IconButton(
             icon: const Icon(Icons.picture_in_picture),
             onPressed: () async {
@@ -301,13 +333,25 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                   padding: const EdgeInsets.all(8.0),
                   child: AspectRatio(
                     aspectRatio: 16 / 9, // 或其他适合的宽高比
-                    child: VideoPlayerView(
-                      onPlatformViewCreated: (id) {
-                        print('Video view created: $id');
-                      },
-                      onDispose: () {
-                        print('Video view disposed');
-                      },
+                    child: Stack(
+                      children: [
+                        VideoPlayerView(
+                          onPlatformViewCreated: (id) {
+                            print('Video view created: $id');
+                          },
+                          onDispose: () {
+                            print('Video view disposed');
+                          },
+                        ),
+                        Positioned(
+                          right: 16,
+                          bottom: 16,
+                          child: Container(
+                            color: Colors.black.withOpacity(0.5),
+                            child: Text('123'),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
