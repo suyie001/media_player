@@ -143,7 +143,7 @@ class MethodChannelMediaPlayer extends MediaPlayerPlatform {
     final mode = await methodChannel.invokeMethod<String>('getPlayMode');
     return PlayMode.values.firstWhere(
       (e) => e.toString().split('.').last == mode,
-      orElse: () => PlayMode.list,
+      orElse: () => PlayMode.all,
     );
   }
 

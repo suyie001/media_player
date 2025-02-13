@@ -138,7 +138,7 @@ class MediaPlayerEventChannel {
   Stream<PlayMode> get playModeStream =>
       eventStream.where((event) => event.type == MediaPlayerEventType.playModeChanged).map((event) => PlayMode.values.firstWhere(
             (e) => e.toString().split('.').last == event.data,
-            orElse: () => PlayMode.list,
+            orElse: () => PlayMode.all,
           ));
 
   /// 获取播放速度变化流

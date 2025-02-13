@@ -45,7 +45,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
   List<MediaItem> _playlist = [];
-  PlayMode _playMode = PlayMode.list;
+  PlayMode _playMode = PlayMode.all;
   double _playbackSpeed = 1.0;
 
   @override
@@ -259,9 +259,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       case PlayMode.all:
         playModeIcon = Icons.all_inclusive;
         break;
-      case PlayMode.list:
-        playModeIcon = Icons.list;
-        break;
+      // case PlayMode.list:
+      //   playModeIcon = Icons.list;
+      //   break;
       case PlayMode.one:
         playModeIcon = Icons.repeat_one;
         break;
@@ -399,9 +399,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                   icon: Icon(playModeIcon),
                   onPressed: () {
                     switch (_playMode) {
-                      case PlayMode.list:
-                        _player.setPlayMode(PlayMode.all);
-                        break;
                       case PlayMode.all:
                         _player.setPlayMode(PlayMode.one);
                         break;
@@ -409,7 +406,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                         _player.setPlayMode(PlayMode.shuffle);
                         break;
                       case PlayMode.shuffle:
-                        _player.setPlayMode(PlayMode.list);
+                        _player.setPlayMode(PlayMode.all);
                         break;
                     }
                   },

@@ -59,7 +59,7 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
     private var videoViewFactory: VideoPlayerViewFactory? = null
     private var flutterEngine: FlutterEngine? = null
     private val playHistory = mutableListOf<Int>()
-    private var currentPlayMode = PlayMode.LIST
+    private var currentPlayMode = PlayMode.ALL
     private var notificationManager: NotificationManager? = null
     private var screenReceiver: BroadcastReceiver? = null
     private var isLoggingEnabled = false
@@ -68,7 +68,6 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
     // 播放模式枚举
     enum class PlayMode {
         ALL,    // 列表循环
-        LIST,   // 列表播放一次
         ONE,    // 单曲循环
         SHUFFLE // 随机播放
     }
@@ -318,11 +317,37 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
                         }
 
                         override fun onPlaybackStateChanged(state: Int) {
-                            if (state == Player.STATE_READY) {
-                                startPeriodicPositionUpdates()
-                            } else {
-                                stopPeriodicPositionUpdates()
+                            
+                            when (state){
+                                Player.STATE_READY -> {
+                                    startPeriodicPositionUpdates()
+                                }
+                                Player.STATE_ENDED -> {
+                                     when (currentPlayMode) {
+                                        PlayMode.ONE -> {
+                                            // 单曲循环：重新播放当前曲
+                                            player?.seekTo(0)
+                                            player?.playWhenReady = true // VERY IMPORTANT
+                                        }
+                                        PlayMode.ALL, PlayMode.SHUFFLE -> { //Combined logic
+                                            // For both ALL and SHUFFLE, if it's the end, go to the beginning.
+                                            if (player?.hasNextMediaItem() == false) {
+                                                player?.seekToDefaultPosition(0)
+                                            }else{
+                                                    player?.seekToNextMediaItem()
+                                                }
+                                            //If not the end, ExoPlayer handles advancing.
+                                            player?.playWhenReady = true // Ensure playback continues
+                                        }
+                                        
+                                    }
+                                    player?.play()
+                                }
+                                else -> {
+                                    stopPeriodicPositionUpdates()
+                                }
                             }
+                           
                         }
 
                         override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
@@ -388,6 +413,26 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
                     "ready"
                 }
                 Player.STATE_ENDED -> {
+                    when (currentPlayMode) {
+                        PlayMode.ONE -> {
+                            // 单曲循环：立即重新开始播放当前曲目
+                            player?.seekTo(0)
+                            player?.play()
+                        }
+                        PlayMode.ALL -> {
+                            // 列表循环：如果是最后一首，跳到第一首
+                            if (!player?.hasNextMediaItem()!!) {
+                                player?.seekToDefaultPosition(0)
+                                player?.play()
+                            } else {
+                                handleNextItem()
+                            }
+                        }
+                        PlayMode.SHUFFLE -> {
+                            // 随机播放逻辑
+                            handleNextItem()
+                        }
+                    }
                     notifyCompleted()
                     "completed"
                 }
@@ -644,7 +689,7 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
                 else -> {
                     if (exoPlayer.hasNextMediaItem()) {
                         exoPlayer.seekToNextMediaItem()
-                    } else if (currentPlayMode == PlayMode.ALL) {
+                    } else  {
                         // 列表循环模式下，返回到第一首
                         exoPlayer.seekToDefaultPosition(0)
                     }
@@ -677,7 +722,7 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
                 else -> {
                     if (exoPlayer.hasPreviousMediaItem()) {
                         exoPlayer.seekToPreviousMediaItem()
-                    } else if (currentPlayMode == PlayMode.ALL) {
+                    } else  {
                         // 列表循环模式下，跳转到最后一首
                         exoPlayer.seekToDefaultPosition(exoPlayer.mediaItemCount - 1)
                     }
@@ -934,17 +979,39 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
                     val mode = call.argument<String>("mode") ?: "all"
                     Log.d("MediaPlayerPlugin", "setPlayMode: $mode")
                     currentPlayMode = when (mode) {
-                        "single" -> PlayMode.ONE
-                        "all" -> PlayMode.ALL
-                        "shuffle" -> PlayMode.SHUFFLE
-                        else -> PlayMode.LIST
+                        "one" -> {
+                            player?.apply {
+                                repeatMode = Player.REPEAT_MODE_ONE
+                                shuffleModeEnabled = false
+                                // 确保当前播放状态保持
+                                if (isPlaying) {
+                                    play()
+                                }
+                            }
+                            Log.d("MediaPlayerPlugin", "PlayMode is : ${player?.repeatMode}")
+                            PlayMode.ONE
+                        }
+                        "all" -> {
+                            player?.apply {
+                                repeatMode = Player.REPEAT_MODE_ALL
+                                shuffleModeEnabled = false
+                            }
+                            PlayMode.ALL
+                        }
+                        "shuffle" -> {
+                            player?.apply {
+                                repeatMode = Player.REPEAT_MODE_ALL
+                                shuffleModeEnabled = true
+                            }
+                            PlayMode.SHUFFLE
+                        }
+                        else -> {
+                            player?.repeatMode = Player.REPEAT_MODE_OFF
+                            player?.shuffleModeEnabled = false
+                            PlayMode.ALL
+                        }
                     }
-                    player?.repeatMode = when (currentPlayMode) {
-                        PlayMode.ONE -> Player.REPEAT_MODE_ONE
-                        PlayMode.ALL -> Player.REPEAT_MODE_ALL
-                        PlayMode.SHUFFLE -> Player.REPEAT_MODE_ALL
-                        else -> Player.REPEAT_MODE_OFF
-                    }
+                   
                     // 切换到随机模式时清空历史记录
                     if (currentPlayMode == PlayMode.SHUFFLE) {
                         playHistory.clear()
@@ -1065,7 +1132,7 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
                 try {
                     val mode = call.argument<String>("mode") ?: "all"
                     player?.repeatMode = when (mode) {
-                        "single" -> Player.REPEAT_MODE_ONE
+                        "one" -> Player.REPEAT_MODE_ONE
                         "all" -> Player.REPEAT_MODE_ALL
                         else -> Player.REPEAT_MODE_OFF
                     }
@@ -1079,7 +1146,7 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
             "getPlaybackMode" -> {
                 try {
                     val mode = when (player?.repeatMode) {
-                        Player.REPEAT_MODE_ONE -> "single"
+                        Player.REPEAT_MODE_ONE -> "one"
                         Player.REPEAT_MODE_ALL -> "all"
                         else -> "off"
                     }

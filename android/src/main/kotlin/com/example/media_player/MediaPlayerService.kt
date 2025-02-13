@@ -27,12 +27,11 @@ class MediaPlayerService : MediaSessionService() {
     // 播放模式
     enum class PlayMode {
         ALL,    // 列表循环
-        LIST,   // 列表播放一次
         ONE,    // 单曲循环
         SHUFFLE // 随机播放
     }
     
-    private var currentPlayMode = PlayMode.LIST
+    private var currentPlayMode = PlayMode.ALL
 
     // 事件广播接口
     interface EventListener {
@@ -250,10 +249,7 @@ class MediaPlayerService : MediaSessionService() {
                 player.repeatMode = Player.REPEAT_MODE_ALL
                 player.shuffleModeEnabled = false
             }
-            PlayMode.LIST -> {
-                player.repeatMode = Player.REPEAT_MODE_OFF
-                player.shuffleModeEnabled = false
-            }
+         
             PlayMode.ONE -> {
                 player.repeatMode = Player.REPEAT_MODE_ONE
                 player.shuffleModeEnabled = false
@@ -331,27 +327,15 @@ class MediaPlayerService : MediaSessionService() {
                 player.seekTo(0)
                 player.play()
             }
-            PlayMode.ALL -> {
+            PlayMode.ALL,PlayMode.SHUFFLE  -> {
                 // 列表循环：如果是最一首，则从头开始
                 if (!player.hasNextMediaItem()) {
-                    player.seekToDefaultPosition(0)
-                    player.play()
-                }
-            }
-            PlayMode.LIST -> {
-                // 列表播放：如果是最后一首，则停止播放
-                if (!player.hasNextMediaItem()) {
-                    player.stop()
-                    notifyPlaybackStateChanged("completed")
-                }
-            }
-            PlayMode.SHUFFLE -> {
-                // 随机播放：继续播放下一首随机歌曲
-                if (!player.hasNextMediaItem()) {
-                    player.seekToDefaultPosition(0)
+                    player.seekToDefaultPosition(0)  
                 }
                 player.play()
             }
+       
+           
         }
     }
     
@@ -411,7 +395,7 @@ class MediaPlayerService : MediaSessionService() {
     private fun notifyPlayModeChanged(mode: PlayMode) {
         val modeString = when (mode) {
             PlayMode.ALL -> "all"
-            PlayMode.LIST -> "list"
+
             PlayMode.ONE -> "one"
             PlayMode.SHUFFLE -> "shuffle"
         }
