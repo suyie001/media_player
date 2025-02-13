@@ -13,7 +13,7 @@ class MediaPlayerHandler: NSObject, FlutterStreamHandler {
     private var currentIndex: Int = 0
     private var playlist: [[String: Any]] = []
     private var artworkCache: [String: MPMediaItemArtwork] = [:]
-    private var playMode: PlayMode = .list // 默认列表模式
+    private var playMode: PlayMode = .all // 默认列表模式
     private var playHistory: [Int] = [] // 用于记录播放历史，支持随机模式下的上一曲功能
     private var isLoggingEnabled: Bool = false
     
@@ -27,7 +27,6 @@ class MediaPlayerHandler: NSObject, FlutterStreamHandler {
     // 播放模式枚举
     enum PlayMode: String {
         case all    // 列表循环
-        case list   // 列表播放一次
         case one    // 单曲循环
         case shuffle // 随机播放
     }
@@ -292,13 +291,7 @@ class MediaPlayerHandler: NSObject, FlutterStreamHandler {
                 skipToNext()
             }
             
-        case .list:
-            // 列表播放：如果不是最后一项则播放下一项，是最后一项则停止
-            if currentIndex < playlist.count - 1 {
-                skipToNext()
-            } else {
-                eventSink?(["type": "playbackStateChanged", "data": "completed"])
-            }
+      
             
         case .one:
             // 单曲循环：重新从播放当前歌曲
@@ -550,53 +543,39 @@ class MediaPlayerHandler: NSObject, FlutterStreamHandler {
     private func updateRemoteCommandsState() {
         let commandCenter = MPRemoteCommandCenter.shared()
         
-        switch playMode {
-        case .all:
-            // 全部循环模式：始终启用所有按钮，因为可以循环播放
+        //  始终启用所有按钮
             commandCenter.nextTrackCommand.isEnabled = true
             commandCenter.previousTrackCommand.isEnabled = true
-            
-        case .list:
-            // 列表播放模式：根据当前位置启用/禁用按钮
-            commandCenter.nextTrackCommand.isEnabled = currentIndex < playerItems.count - 1
-            commandCenter.previousTrackCommand.isEnabled = currentIndex > 0
-            
-        case .one, .shuffle:
-            // 单曲循环和随机播放模式：始终启用所有按钮
-            commandCenter.nextTrackCommand.isEnabled = true
-            commandCenter.previousTrackCommand.isEnabled = true
-        }
     }
     
     func skipToNext() {
         switch playMode {
         case .shuffle:
-            guard playlist.count > 1 else { return }
-            
-            // 记录当前索引到历史
+            // 如果播放列表只有一首歌或为空，则直接返回，不做任何操作
+            if playlist.count <= 1 {
+                return
+            }
+
+            // 将当前播放的歌曲索引添加到播放历史中
             playHistory.append(currentIndex)
-            
-            // 随机选择下一首（排除当前播放的）
+
+            // 随机选择下一首要播放的歌曲（确保不与当前播放的歌曲相同）
             var nextIndex: Int
             repeat {
                 nextIndex = Int.random(in: 0..<playlist.count)
             } while nextIndex == currentIndex
-            
+
+            // 更新当前播放的索引
             currentIndex = nextIndex
             
-        case .all, .list, .one:
-            guard currentIndex < playerItems.count - 1 else {
-                if playMode == .all {
-                    // 全部循环模式下，从头开始
-                    currentIndex = 0
-                    // 直接跳出,避免执行 currentIndex += 1
-                    break
-                } else {
-                    return
-                }
-                 
+        case .all, .one:
+            // 如果当前播放的歌曲不是列表中的最后一首
+            if currentIndex < playerItems.count - 1 {
+                // 播放下一首歌曲
+                currentIndex += 1
+            } else { // 如果当前播放的是最后一首歌曲，则从头开始
+                currentIndex = 0
             }
-            currentIndex += 1
         }
         
         
@@ -630,18 +609,14 @@ class MediaPlayerHandler: NSObject, FlutterStreamHandler {
                 }
             }
             
-        case .all, .list, .one:
-            guard currentIndex > 0 else {
-                if playMode == .all {
-                    // 列表循环模式下，跳到最后一首
-                    currentIndex = playerItems.count - 1
-                    // 直接跳出,避免执行 currentIndex -= 1
-                    break
-                } else {
-                    return
-                }
+        case .all, .one:
+            // 如果当前不是第一首歌曲
+            if currentIndex > 0 {
+                // 播放上一首歌曲
+                currentIndex -= 1
+            } else { // 如果当前是第一首歌曲，则跳到最后一首
+                currentIndex = playerItems.count - 1
             }
-            currentIndex -= 1
         }
         
         player.replaceCurrentItem(with: playerItems[currentIndex])
