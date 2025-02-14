@@ -77,6 +77,7 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
 
     private var playbackService: PlaybackService? = null
     private var isServiceBound = false
+    private var isSessionInitialized = false // 添加一个标志位
 
     private var serviceConnection = object : android.content.ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: android.os.IBinder?) {
@@ -292,6 +293,9 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
     }
 
     private fun initializePlayer() {
+        if (isSessionInitialized) { // 检查是否已经初始化
+            return
+        }
         try {
             // 创建 ExoPlayer 实例
             player = ExoPlayer.Builder(context)
@@ -306,86 +310,15 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
                 .build()
                 .apply {
                     addListener(playerListener)
-                    // 添加位置监听器
-                    addListener(object : Player.Listener {
-                        override fun onPositionDiscontinuity(
-                            oldPosition: Player.PositionInfo,
-                            newPosition: Player.PositionInfo,
-                            reason: Int
-                        ) {
-                            notifyPositionChanged(newPosition.positionMs)
-                        }
-
-                        override fun onPlaybackStateChanged(state: Int) {
-                            
-                            when (state){
-                                Player.STATE_READY -> {
-                                    startPeriodicPositionUpdates()
-                                }
-                                Player.STATE_ENDED -> {
-                                     when (currentPlayMode) {
-                                        PlayMode.ONE -> {
-                                            // 单曲循环：重新播放当前曲
-                                            player?.seekTo(0)
-                                            player?.playWhenReady = true // VERY IMPORTANT
-                                        }
-                                        PlayMode.ALL, PlayMode.SHUFFLE -> { //Combined logic
-                                            // For both ALL and SHUFFLE, if it's the end, go to the beginning.
-                                            if (player?.hasNextMediaItem() == false) {
-                                                player?.seekToDefaultPosition(0)
-                                            }else{
-                                                    player?.seekToNextMediaItem()
-                                                }
-                                            //If not the end, ExoPlayer handles advancing.
-                                            player?.playWhenReady = true // Ensure playback continues
-                                        }
-                                        
-                                    }
-                                    player?.play()
-                                }
-                                else -> {
-                                    stopPeriodicPositionUpdates()
-                                }
-                            }
-                           
-                        }
-
-                        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
-                            if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_REMOTE) {
-                                // 音频焦点变化导致的播放状态改变
-                                if (playWhenReady) {
-                                    startPeriodicPositionUpdates()
-                                    // 手动触发一次位置更新
-                                    player?.currentPosition?.let { position ->
-                                        notifyPositionChanged(position)
-                                    }
-                                } else {
-                                    stopPeriodicPositionUpdates()
-                                    // 发送最后一次位置
-                                    player?.currentPosition?.let { position ->
-                                        notifyPositionChanged(position)
-                                    }
-                                }
-                            } else {
-                                // 其他原因导致的播放状态改变
-                                if (playWhenReady) {
-                                    startPeriodicPositionUpdates()
-                                } else {
-                                    stopPeriodicPositionUpdates()
-                                    // 暂停时发送最后一次位置
-                                    player?.currentPosition?.let { position ->
-                                        notifyPositionChanged(position)
-                                    }
-                                }
-                            }
-                        }
-                    })
+                   
+                     
                 }
 
             mediaSession = player?.let { 
                 MediaSession.Builder(context, it)
                     .setCallback(mediaSessionCallback)
-                    .setId("MediaPlayerService")
+                    .setId("BunnyUMediaPlayerService")// 使用一个唯一的 ID
+
                     .build()
             }
 
@@ -409,6 +342,7 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
                     // 播放器准备好时发送时长
                     player?.duration?.let { duration ->
                         notifyDurationChanged(duration)
+                        startPeriodicPositionUpdates()
                     }
                     "ready"
                 }
@@ -417,26 +351,28 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
                         PlayMode.ONE -> {
                             // 单曲循环：立即重新开始播放当前曲目
                             player?.seekTo(0)
-                            player?.play()
+                           
+                            player?.playWhenReady = true
                         }
-                        PlayMode.ALL -> {
-                            // 列表循环：如果是最后一首，跳到第一首
-                            if (!player?.hasNextMediaItem()!!) {
+                        PlayMode.ALL, PlayMode.SHUFFLE -> { //Combined logic
+                            // For both ALL and SHUFFLE, if it's the end, go to the beginning.
+                            if (player?.hasNextMediaItem() == false) {
                                 player?.seekToDefaultPosition(0)
-                                player?.play()
-                            } else {
-                                handleNextItem()
-                            }
-                        }
-                        PlayMode.SHUFFLE -> {
-                            // 随机播放逻辑
-                            handleNextItem()
+                            }else{
+                                    player?.seekToNextMediaItem()
+                                }
+                            //If not the end, ExoPlayer handles advancing.
+                            player?.playWhenReady = true // Ensure playback continues
                         }
                     }
+                    player?.play()
                     notifyCompleted()
                     "completed"
                 }
-                else -> "unknown"
+                else -> {
+                    stopPeriodicPositionUpdates()
+                    "unknown"
+                    }
             }
              // 只在状态真正改变时通知
         if (lastPlaybackState != state) {
@@ -505,6 +441,33 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
         override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
             val state = if (playWhenReady) "playing" else "paused"
             notifyPlaybackStateChanged(state)
+            if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_REMOTE) {
+                    // 音频焦点变化导致的播放状态改变
+                    if (playWhenReady) {
+                        startPeriodicPositionUpdates()
+                        // 手动触发一次位置更新
+                        player?.currentPosition?.let { position ->
+                            notifyPositionChanged(position)
+                        }
+                    } else {
+                        stopPeriodicPositionUpdates()
+                        // 发送最后一次位置
+                        player?.currentPosition?.let { position ->
+                            notifyPositionChanged(position)
+                        }
+                    }
+                } else {
+                    // 其他原因导致的播放状态改变
+                    if (playWhenReady) {
+                        startPeriodicPositionUpdates()
+                    } else {
+                        stopPeriodicPositionUpdates()
+                        // 暂停时发送最后一次位置
+                        player?.currentPosition?.let { position ->
+                            notifyPositionChanged(position)
+                        }
+                    }
+                }
         }
 
         override fun onPlayerError(error: PlaybackException) {
@@ -535,6 +498,11 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
         override fun onAvailableCommandsChanged(availableCommands: Player.Commands) {
             // 可以在这里添加可用命令变化的通知，如果需要的话
         }
+     
+
+      
+
+
     }
 
     private val mediaSessionCallback = object : MediaSession.Callback {
@@ -1237,5 +1205,9 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
         lastPlaybackState = "none"
         serviceJob.cancel()
         flutterEngine = null
+        isSessionInitialized = false
+
+        val intent = Intent(context, PlaybackService::class.java)
+        context.stopService(intent)
     }
 }
