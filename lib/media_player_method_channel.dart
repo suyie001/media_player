@@ -165,6 +165,18 @@ class MethodChannelMediaPlayer extends MediaPlayerPlatform {
   }
 
   @override
+  Future<void> switchToVideo(String url) async {
+    await methodChannel.invokeMethod('switchToVideo', {
+      'videoUrl': url,
+    });
+  }
+
+  @override
+  Future<void> switchToAudio() async {
+    await methodChannel.invokeMethod('switchToAudio');
+  }
+
+  @override
   Future<void> updateCurrentUrl(String url) async {
     await methodChannel.invokeMethod('updateCurrentUrl', {
       'url': url,
@@ -191,5 +203,10 @@ class MethodChannelMediaPlayer extends MediaPlayerPlatform {
     return methodChannel.invokeMethod('setLoggingEnabled', {
       'enabled': enabled,
     });
+  }
+
+  @override
+  Future<void> release() {
+    return methodChannel.invokeMethod('release');
   }
 }

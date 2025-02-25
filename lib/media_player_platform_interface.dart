@@ -215,6 +215,16 @@ abstract class MediaPlayerPlatform extends PlatformInterface {
     throw UnimplementedError('hideVideoView() has not been implemented.');
   }
 
+  /// 切换到视频
+  Future<void> switchToVideo(String url) {
+    throw UnimplementedError('switchToVideo() has not been implemented.');
+  }
+
+  /// 切换到音频
+  Future<void> switchToAudio() {
+    throw UnimplementedError('switchToAudio() has not been implemented.');
+  }
+
   /// 更新当前播放URL
   Future<void> updateCurrentUrl(String url) {
     throw UnimplementedError('updateCurrentUrl() has not been implemented.');
@@ -237,5 +247,10 @@ abstract class MediaPlayerPlatform extends PlatformInterface {
 
   Future<void> setLoggingEnabled(bool enabled) {
     throw UnimplementedError('setLoggingEnabled() has not been implemented.');
+  }
+
+  /// 释放播放器
+  Future<void> release() {
+    throw UnimplementedError('release() has not been implemented.');
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
 
@@ -98,6 +99,7 @@ class _AndroidVideoPlayerState extends State<_AndroidVideoPlayer> {
         creationParams: <String, dynamic>{
           'backgroundColor': Colors.black.value,
         },
+        hitTestBehavior: PlatformViewHitTestBehavior.transparent,
         creationParamsCodec: const StandardMessageCodec(),
         gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
           Factory<VerticalDragGestureRecognizer>(() => VerticalDragGestureRecognizer()),

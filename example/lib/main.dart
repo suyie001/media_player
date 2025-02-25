@@ -74,6 +74,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _player.release();
     super.dispose();
   }
 
@@ -215,6 +216,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     });
 
     await _player.setPlaylist(playlist);
+    _player.setPlayMode(PlayMode.all);
     _player.jumpTo(2);
     _player.seekTo(Duration(seconds: 10));
     // _player.pause();
@@ -222,6 +224,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   }
 
   Future<void> checkoutToAudio() async {
+    if (Platform.isAndroid) {
+      await _player.switchToAudio();
+    }
     Duration position = _position;
     // await _player.updateCurrentUrl('http://oss-api-audio.zuidie.net/audio/MP3L/94703ba232f343a6b4a0c970c6eaa6d1.mp3');
     await _player.seekTo(position);
@@ -233,8 +238,13 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       _isVideoViewVisible = true;
     });
     Duration position = _position;
-    await _player.updateCurrentUrl('http://oss-api-audio.zuidie.net/audio/MP4L/7f12cb0dc07148898ef5b949e84b2eb6.mp4');
-    await _player.showVideoView();
+
+    if (Platform.isIOS) {
+      await _player.updateCurrentUrl('http://oss-api-audio.zuidie.net/audio/MP4L/7f12cb0dc07148898ef5b949e84b2eb6.mp4');
+      await _player.showVideoView();
+    } else {
+      await _player.switchToVideo('http://oss-api-audio.zuidie.net/audio/MP4L/7f12cb0dc07148898ef5b949e84b2eb6.mp4');
+    }
     // _player.startPictureInPicture();
     // setState(() {
     //   _isVideoViewVisible = true;

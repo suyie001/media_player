@@ -168,6 +168,14 @@ class MediaPlayer {
     return MediaPlayerPlatform.instance.hideVideoView();
   }
 
+  Future<void> switchToVideo(String url) async {
+    return MediaPlayerPlatform.instance.switchToVideo(url);
+  }
+
+  Future<void> switchToAudio() async {
+    return MediaPlayerPlatform.instance.switchToAudio();
+  }
+
   Future<void> updateCurrentUrl(String url) async {
     return MediaPlayerPlatform.instance.updateCurrentUrl(url);
   }
@@ -187,5 +195,9 @@ class MediaPlayer {
   /// 启用或禁用日志
   Future<void> setLoggingEnabled(bool enabled) {
     return MediaPlayerPlatform.instance.setLoggingEnabled(enabled);
+  }
+
+  Future<void> release() {
+    return MediaPlayerPlatform.instance.release();
   }
 }

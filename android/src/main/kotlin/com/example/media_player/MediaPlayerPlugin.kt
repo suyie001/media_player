@@ -46,6 +46,13 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleRegistry
+import androidx.media3.database.StandaloneDatabaseProvider
+import androidx.media3.datasource.cache.CacheDataSource
+import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
+import androidx.media3.datasource.cache.SimpleCache
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import java.io.File
 
 @UnstableApi
 class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
@@ -56,14 +63,21 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
     private var player: ExoPlayer? = null
     private val serviceJob = SupervisorJob()
     private val serviceScope = CoroutineScope(Dispatchers.Main + serviceJob)
-    private var videoViewFactory: VideoPlayerViewFactory? = null
-    private var flutterEngine: FlutterEngine? = null
     private val playHistory = mutableListOf<Int>()
     private var currentPlayMode = PlayMode.ALL
     private var notificationManager: NotificationManager? = null
     private var screenReceiver: BroadcastReceiver? = null
     private var isLoggingEnabled = false
     private var isPlayingState : Boolean? = null
+    private var isServiceBound = false
+    private var playbackService: PlaybackService? = null
+    private var currentAudioUrl: String? = null
+    private var isSessionInitialized = false
+    private var lastPlaybackState = "none"
+    private var cache: SimpleCache? = null
+    private var eventSink: EventChannel.EventSink? = null
+    private lateinit var methodChannel: MethodChannel
+    private lateinit var eventChannel: EventChannel
 
     // 播放模式枚举
     enum class PlayMode {
@@ -71,13 +85,6 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
         ONE,    // 单曲循环
         SHUFFLE // 随机播放
     }
-
-    private lateinit var methodChannel: MethodChannel
-    private lateinit var eventChannel: EventChannel
-
-    private var playbackService: PlaybackService? = null
-    private var isServiceBound = false
-    private var isSessionInitialized = false // 添加一个标志位
 
     private var serviceConnection = object : android.content.ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: android.os.IBinder?) {
@@ -96,7 +103,6 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
 
     private val lastEventTimes = mutableMapOf<String, Long>()
     private val DEBOUNCE_INTERVAL = 200L // 防抖时间间隔（毫秒）
-    private var lastPlaybackState = "none"
 
     private fun shouldDebounce(eventType: String): Boolean {
         val lastTime = lastEventTimes[eventType] ?: 0L
@@ -192,7 +198,7 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
     override fun onAttachedToEngine(@NonNull binding: FlutterPlugin.FlutterPluginBinding) {
         context = binding.applicationContext
         messenger = binding.binaryMessenger
-        flutterEngine = binding.flutterEngine
+        // flutterEngine = binding.flutterEngine
         methodChannel = MethodChannel(messenger, "media_player")
         eventChannel = EventChannel(messenger, "media_player_events")
         
@@ -219,58 +225,11 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
             if (player == null) {
                 initializePlayer()
             }
-            // 创建并注册视频视图工厂
-            videoViewFactory = VideoPlayerViewFactory(context, player!!)
-            flutterEngine?.platformViewsController?.registry
-                ?.registerViewFactory("media_player_video_view", videoViewFactory!!)
             
-            // 注册屏幕锁定广播接收器
-            registerScreenReceiver()
-        }
-    }
-
-    private fun registerScreenReceiver() {
-        if (screenReceiver == null) {
-            screenReceiver = object : BroadcastReceiver() {
-                override fun onReceive(context: Context?, intent: Intent?) {
-                    when (intent?.action) {
-                        Intent.ACTION_SCREEN_OFF -> {
-                            log("MediaPlayerPlugin", "Screen turned off")
-                            Handler(Looper.getMainLooper()).postDelayed({
-                                player?.currentMediaItem?.let { mediaItem ->
-                                    setupNotification(mediaItem)
-                                }
-                            }, 1000)
-                        }
-                        Intent.ACTION_USER_PRESENT -> {
-                            log("MediaPlayerPlugin", "Screen unlocked")
-                            player?.currentMediaItem?.let { mediaItem ->
-                                setupNotification(mediaItem)
-                            }
-                        }
-                    }
-                }
-            }
-
-            val filter = IntentFilter().apply {
-                addAction(Intent.ACTION_SCREEN_OFF)
-                addAction(Intent.ACTION_USER_PRESENT)
-            }
             
-            context.registerReceiver(screenReceiver, filter)
         }
     }
 
-    private fun unregisterScreenReceiver() {
-        screenReceiver?.let {
-            try {
-                context.unregisterReceiver(it)
-                screenReceiver = null
-            } catch (e: Exception) {
-                Log.e("MediaPlayerPlugin", "Error unregistering screen receiver", e)
-            }
-        }
-    }
 
     override fun onDetachedFromActivityForConfigChanges() {
         activity = null
@@ -293,12 +252,36 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
     }
 
     private fun initializePlayer() {
-        if (isSessionInitialized) { // 检查是否已经初始化
+        if (isSessionInitialized) {
             return
         }
         try {
-            // 创建 ExoPlayer 实例
+            // 1. Create a CacheEvictor.
+            val cacheEvictor = LeastRecentlyUsedCacheEvictor(100 * 1024 * 1024) // 100MB cache size
+
+            // 2. Create a StandaloneDatabaseProvider.
+            val databaseProvider = StandaloneDatabaseProvider(context)
+
+            // 3. Create a SimpleCache.  Make sure the cache directory exists.
+            val cacheDir = File(context.cacheDir, "media")
+            cacheDir.mkdirs() // Ensure the directory exists
+            cache = SimpleCache(cacheDir, cacheEvictor, databaseProvider)
+
+            // 4. Create a DefaultHttpDataSourceFactory.
+            val httpDataSourceFactory = DefaultHttpDataSource.Factory()
+
+            // 5. Create a CacheDataSourceFactory.
+            val cacheDataSourceFactory = CacheDataSource.Factory()
+                .setCache(cache!!)
+                .setUpstreamDataSourceFactory(httpDataSourceFactory)
+                .setFlags(CacheDataSource.FLAG_BLOCK_ON_CACHE or CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+
+            // 6. Create the ExoPlayer.
             player = ExoPlayer.Builder(context)
+                .setMediaSourceFactory(
+                    DefaultMediaSourceFactory(context)
+                        .setDataSourceFactory(cacheDataSourceFactory) // Use the CacheDataSourceFactory
+                )
                 .setAudioAttributes(
                     AudioAttributes.Builder()
                         .setUsage(C.USAGE_MEDIA)
@@ -310,8 +293,6 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
                 .build()
                 .apply {
                     addListener(playerListener)
-                   
-                     
                 }
 
             mediaSession = player?.let { 
@@ -330,8 +311,6 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
             throw e
         }
     }
-
-    private var eventSink: EventChannel.EventSink? = null
 
     private val playerListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
@@ -921,11 +900,9 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
                 result.success(null)
             }
             "showVideoView" -> {
-                videoViewFactory?.setVideoEnabled(true)
                 result.success(null)
             }
             "hideVideoView" -> {
-                videoViewFactory?.setVideoEnabled(false)
                 result.success(null)
             }
             "addToPlaylist" -> {
@@ -1185,29 +1162,76 @@ class MediaPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
                     result.error("URL_UPDATE_ERROR", e.message, null)
                 }
             }
+            "switchToVideo" -> {
+                result.success(null)
+            }
+            "switchToAudio" -> {
+                result.success(null)
+            }
+            "release" -> {
+                release()
+                result.success(null)
+            }
             else -> result.notImplemented()
+        }
+    }
+
+    private fun release() {
+        try {
+            // 停止位置更新
+            stopPeriodicPositionUpdates()
+            
+            // 释放播放器
+            player?.run {
+                removeListener(playerListener)
+                stop()
+                release()
+                player = null
+            }
+            
+            // 释放 MediaSession
+            mediaSession?.run {
+                release()
+                mediaSession = null
+            }
+            
+            // 释放通知管理器
+            notificationManager?.hideNotification()
+            notificationManager = null
+            
+           
+            
+            // 释放缓存
+            cache?.release()
+            cache = null
+            
+            // 重置状态
+            currentAudioUrl = null
+            isSessionInitialized = false
+            lastPlaybackState = "none"
+            
+            // 取消协程作用域
+            serviceJob.cancel()
+            
+            // 停止服务
+            val intent = Intent(context, PlaybackService::class.java)
+            if (isServiceBound) {
+                try {
+                    context.unbindService(serviceConnection)
+                } catch (e: Exception) {
+                    log("MediaPlayerPlugin", "Error unbinding service: ${e.message}", true)
+                }
+                isServiceBound = false
+            }
+            context.stopService(intent)
+            
+        } catch (e: Exception) {
+            log("MediaPlayerPlugin", "Error during release: ${e.message}", true)
         }
     }
 
     override fun onDetachedFromEngine(@NonNull binding: FlutterPlugin.FlutterPluginBinding) {
         methodChannel.setMethodCallHandler(null)
         eventChannel.setStreamHandler(null)
-        
-        notificationManager?.hideNotification()
-        unregisterScreenReceiver()
-        
-        mediaSession?.release()
-        stopPeriodicPositionUpdates()
-        player?.release()
-        player = null
-        mediaSession = null
-        videoViewFactory = null
-        lastPlaybackState = "none"
-        serviceJob.cancel()
-        flutterEngine = null
-        isSessionInitialized = false
-
-        val intent = Intent(context, PlaybackService::class.java)
-        context.stopService(intent)
     }
 }

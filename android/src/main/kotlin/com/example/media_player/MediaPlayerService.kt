@@ -86,6 +86,8 @@ class MediaPlayerService : MediaSessionService() {
             initializePlayer()
             initializeMediaSession()
             startPositionUpdates()
+
+            
             android.util.Log.d("MediaPlayerService", "Service initialization completed successfully")
         } catch (e: Exception) {
             android.util.Log.e("MediaPlayerService", "Error during service initialization", e)
